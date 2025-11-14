@@ -6,7 +6,7 @@ import java.util.Map;
 
 /**
  * Модель конфигурации клиента (DTO), преобразованная в Java Record.
- * Аналог объекта 'client' в ответе API.
+ * Содержит все данные, необходимые для запуска любой версии клиента.
  */
 public record ClientData(
 
@@ -14,11 +14,23 @@ public record ClientData(
         @SerializedName("id")
         String versionId,
 
-        /* Список аргументов JVM для запуска Minecraft. */
+        /* Главный класс для запуска (e.g., net.minecraft.launchwrapper.Launch). */
+        @SerializedName("mainClass")
+        String mainClass,
+
+        /* TweakClass для старых версий Forge (опционально). */
+        @SerializedName("tweakClass")
+        String tweakClass,
+
+        /* Индекс ассетов (e.g., "1.12" or "1.21"). */
+        @SerializedName("assetIndex")
+        String assetIndex,
+
+        /* Список аргументов JVM (из API). */
         @SerializedName("jvmArguments")
         List<String> jvmArguments,
 
-        /* Список аргументов Minecraft. */
+        /* Список аргументов Minecraft (из API). */
         @SerializedName("mcArguments")
         List<String> mcArguments,
 
