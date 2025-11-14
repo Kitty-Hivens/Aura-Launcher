@@ -18,8 +18,15 @@ public interface ILauncherService {
      * @param serverData Данные о выбранном сервере (версия, имя).
      * @param clientRootPath Абсолютный путь к корню клиента.
      * @param javaExecutablePath Абсолютный путь к исполняемому файлу java.
+     * @param allocatedMemoryMB Объем выделяемой памяти в МБ (e.g., 4096).
      * @return Запущенный процесс (Process) для мониторинга.
      * @throws IOException в случае ошибки I/O при запуске.
      */
-    Process launchClient(SessionData sessionData, ServerData serverData, Path clientRootPath, Path javaExecutablePath) throws IOException;
+    Process launchClient(
+            SessionData sessionData,
+            ServerData serverData,
+            Path clientRootPath,
+            Path javaExecutablePath,
+            int allocatedMemoryMB
+    ) throws IOException;
 }
