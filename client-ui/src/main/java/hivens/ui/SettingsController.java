@@ -11,7 +11,6 @@ import java.io.IOException;
 
 /**
  * Контроллер для Settings.fxml.
- * (Аналог ae.class).
  */
 public class SettingsController {
 
@@ -22,10 +21,13 @@ public class SettingsController {
     @FXML private TextField themePathField;
 
     private final ISettingsService settingsService;
+    private final Main mainApp; // (Добавлено)
     private SettingsData currentSettings;
 
-    public SettingsController(LauncherDI di) {
+    // (Конструктор обновлен)
+    public SettingsController(LauncherDI di, Main mainApp) {
         this.settingsService = di.getSettingsService();
+        this.mainApp = mainApp;
     }
 
     @FXML
@@ -41,7 +43,6 @@ public class SettingsController {
             themePathField.setText(currentSettings.customThemePath());
         } catch (IOException e) {
             log.error("Failed to load settings", e);
-            // (Показать ошибку в UI)
         }
     }
 
@@ -49,16 +50,15 @@ public class SettingsController {
     private void onSaveClick() {
         try {
             SettingsData newSettings = new SettingsData(
-                javaPathField.getText(),
-                Integer.parseInt(memoryField.getText()), // (Требуется валидация)
-                themePathField.getText()
+                    javaPathField.getText(),
+                    Integer.parseInt(memoryField.getText()),
+                    themePathField.getText()
             );
             settingsService.saveSettings(newSettings);
             this.currentSettings = newSettings;
-            // (Показать "Сохранено" в UI)
-            
-            // TODO: Вернуться к главному экрану (вызвать метод в Main)
-            
+
+            mainApp.showLoginScene(); // (Возврат к главному экрану)
+
         } catch (IOException e) {
             log.error("Failed to save settings", e);
         } catch (NumberFormatException e) {
@@ -68,6 +68,10 @@ public class SettingsController {
 
     @FXML
     private void onCancelClick() {
-        // TODO: Вернуться к главному экрану (вызвать метод в Main)
+        try {
+            mainApp.showLoginScene(); // (Возврат к главному экрану)
+        } catch (IOException e) {
+            log.error("Failed to return to Login scene", e);
+        }
     }
 }

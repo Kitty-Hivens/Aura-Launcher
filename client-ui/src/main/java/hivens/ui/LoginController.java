@@ -2,129 +2,169 @@ package hivens.ui;
 
 import hivens.core.api.AuthException;
 import hivens.core.api.IAuthService;
+import hivens.core.api.IServerListService;
+import hivens.core.api.ISettingsService;
+import hivens.core.data.ServerData;
+import hivens.core.data.ServerListResponse;
 import hivens.core.data.SessionData;
+import hivens.core.data.SettingsData;
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+
 /**
  * Контроллер для LoginForm.fxml.
- * Отвечает за обработку ввода пользователя и вызов IAuthService.
  */
 public class LoginController {
 
     private static final Logger log = LoggerFactory.getLogger(LoginController.class);
 
-    // FXML Поля (ID должны совпадать с LoginForm.fxml)
     @FXML private TextField login;
     @FXML private PasswordField password;
     @FXML private Button enter;
+    @FXML private Button settings;
     @FXML private Label status;
-    // @FXML private ComboBox servers; // (Будет добавлено позже)
+    @FXML private ComboBox<ServerData> servers;
 
-    // Зависимости (DI)
     private final IAuthService authService;
-    private final LauncherDI diContainer; // Для доступа к другим сервисам
+    private final IServerListService serverListService;
+    private final ISettingsService settingsService;
+    private final Main mainApp;
+    private SettingsData currentSettings;
 
-    /**
-     * Конструктор для внедрения зависимостей.
-     */
-    public LoginController(LauncherDI diContainer) {
-        this.diContainer = diContainer;
-        this.authService = diContainer.getAuthService();
+    public LoginController(LauncherDI di, Main mainApp) {
+        this.authService = di.getAuthService();
+        this.serverListService = di.getServerListService();
+        this.settingsService = di.getSettingsService();
+        this.mainApp = mainApp;
     }
 
-    /**
-     * Вызывается JavaFX после FXML-инъекций.
-     */
     @FXML
     public void initialize() {
-        // (Здесь можно установить текст по умолчанию
-        // this.login.setPromptText("Логин");
-        // this.password.setPromptText("Пароль");
+        setControlsDisabled(true);
+        status.setText("Загрузка настроек...");
+
+        Task<SettingsData> settingsTask = new Task<>() {
+            @Override
+            protected SettingsData call() throws Exception {
+                return settingsService.loadSettings();
+            }
+        };
+
+        settingsTask.setOnFailed(e -> {
+            log.error("Failed to load settings! Using defaults.", settingsTask.getException());
+            this.currentSettings = SettingsData.defaults();
+            loadServerList();
+        });
+
+        settingsTask.setOnSucceeded(e -> {
+            this.currentSettings = settingsTask.getValue();
+            loadServerList();
+        });
+
+        new Thread(settingsTask).start();
     }
 
-    /**
-     * Обработчик нажатия кнопки "Войти" (id="enter").
-     */
+    private void loadServerList() {
+        status.setText("Загрузка списка серверов...");
+        Task<ServerListResponse> task = new Task<>() {
+            @Override
+            protected ServerListResponse call() throws Exception {
+                return serverListService.getServerList();
+            }
+        };
+
+        task.setOnFailed(e -> {
+            updateStatus("Ошибка загрузки списка серверов.", true);
+            log.error("Failed to load server list", task.getException());
+        });
+
+        task.setOnSucceeded(e -> {
+            ServerListResponse response = task.getValue();
+            servers.getItems().setAll(response.servers());
+            servers.getSelectionModel().selectFirst();
+            setControlsDisabled(false);
+            updateStatus("Готов к входу.", false);
+        });
+
+        new Thread(task).start();
+    }
+
     @FXML
     private void onLoginClick() {
         String username = login.getText();
         String pass = password.getText();
-        
-        // TODO: Добавить ComboBox для serverId
-        String serverId = "Industrial"; // Временная заглушка
+        ServerData selectedServer = servers.getSelectionModel().getSelectedItem();
 
-        if (username.isEmpty() || pass.isEmpty()) {
-            updateStatus("Логин и пароль не могут быть пустыми.", true);
+        if (username.isEmpty() || pass.isEmpty() || selectedServer == null) {
+            updateStatus("Заполните все поля и выберите сервер.", true);
             return;
         }
 
-        // 1. Создаем фоновую задачу (Task) для сетевого запроса
-        Task<SessionData> loginTask = createLoginTask(username, pass, serverId);
-        
-        // 2. Настраиваем UI-реакции на задачу
+        Task<SessionData> loginTask = new Task<>() {
+            @Override
+            protected SessionData call() throws Exception {
+                return authService.login(username, pass, selectedServer.name());
+            }
+        };
+
         loginTask.setOnRunning(e -> setControlsDisabled(true));
         loginTask.setOnFailed(e -> handleLoginFailure(loginTask.getException()));
-        loginTask.setOnSucceeded(e -> handleLoginSuccess(loginTask.getValue()));
-        
-        // 3. Запускаем задачу
+
+        loginTask.setOnSucceeded(e -> {
+            SessionData session = loginTask.getValue();
+            Platform.runLater(() -> {
+                try {
+                    mainApp.showProgressScene(session, selectedServer, currentSettings);
+                } catch (IOException ex) {
+                    log.error("Failed to switch to Progress scene", ex);
+                    handleLoginFailure(ex);
+                }
+            });
+        });
+
         new Thread(loginTask).start();
     }
 
-    /**
-     * Создает Task для асинхронной аутентификации.
-     */
-    private Task<SessionData> createLoginTask(String username, String pass, String serverId) {
-        return new Task<>() {
-            @Override
-            protected SessionData call() throws Exception {
-                // Этот код выполняется в фоновом потоке
-                return authService.login(username, pass, serverId);
-            }
-        };
+    @FXML
+    private void onSettingsClick() {
+        try {
+            mainApp.showSettingsScene();
+        } catch (IOException e) {
+            log.error("Failed to open Settings scene", e);
+        }
     }
 
-    /**
-     * Обработка успешного входа (вызывается в UI-потоке).
-     */
-    private void handleLoginSuccess(SessionData sessionData) {
-        log.info("Login successful for {}", sessionData.playerName());
-        updateStatus("Успешный вход.", false);
-        
-        // TODO: Переключить сцену на Main.fxml / Progress.fxml
-    }
-
-    /**
-     * Обработка ошибок входа (вызывается в UI-потоке).
-     */
     private void handleLoginFailure(Throwable exception) {
         setControlsDisabled(false);
+        String errorMsg = "Ошибка сети.";
         if (exception instanceof AuthException authEx) {
-            // Ошибка аутентификации (например, неверный пароль)
             log.warn("AuthException: {}", authEx.getStatus());
-            updateStatus("Ошибка: " + authEx.getStatus(), true); // (Используем AuthStatus)
+            errorMsg = "Ошибка: " + authEx.getStatus();
         } else {
-            // Сетевая ошибка (IOException)
             log.error("Network or IO error", exception);
-            updateStatus("Ошибка сети.", true);
         }
+        updateStatus(errorMsg, true);
     }
 
     private void setControlsDisabled(boolean disabled) {
         login.setDisable(disabled);
         password.setDisable(disabled);
         enter.setDisable(disabled);
+        settings.setDisable(disabled);
+        servers.setDisable(disabled);
     }
-    
+
     private void updateStatus(String message, boolean isError) {
         status.setText(message);
-        // (Здесь можно добавить CSS-класс для ошибки)
-        // status.getStyleClass().setAll(isError ? "status-error" : "status-success");
     }
 }
