@@ -66,7 +66,7 @@ public class AuthService implements IAuthService {
         Request request = new Request.Builder()
                 .url(ServiceEndpoints.AUTH_LOGIN) // (AUTH_LOGIN должен быть "auth/login" или аналогичным)
                 .post(body)
-                .header("User-Agent", "SMARTYlauncher/3.6.2")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36")
                 .header("Accept", "application/json")
                 .build();
 

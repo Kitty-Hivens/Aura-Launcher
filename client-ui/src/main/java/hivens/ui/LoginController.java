@@ -16,10 +16,13 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.util.StringConverter;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Контроллер для LoginForm.fxml.
@@ -41,6 +44,8 @@ public class LoginController {
     private final Main mainApp;
     private SettingsData currentSettings;
 
+    private final AtomicBoolean serverListLoaded = new AtomicBoolean(false);
+
     public LoginController(LauncherDI di, Main mainApp) {
         this.authService = di.getAuthService();
         this.serverListService = di.getServerListService();
@@ -53,6 +58,25 @@ public class LoginController {
         setControlsDisabled(true);
         status.setText("Загрузка настроек...");
 
+        servers.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(ServerData server) {
+                return server == null ? "Выберите сервер..." : server.name() + " (" + server.version() + ")";
+            }
+
+            @Override
+            public ServerData fromString(String string) {
+                return null;
+            }
+        });
+
+        Task<SettingsData> settingsTask = getSettingsTask();
+
+        new Thread(settingsTask).start();
+    }
+
+    @NotNull
+    private Task<SettingsData> getSettingsTask() {
         Task<SettingsData> settingsTask = new Task<>() {
             @Override
             protected SettingsData call() throws Exception {
@@ -70,11 +94,14 @@ public class LoginController {
             this.currentSettings = settingsTask.getValue();
             loadServerList();
         });
-
-        new Thread(settingsTask).start();
+        return settingsTask;
     }
 
     private void loadServerList() {
+        if (!serverListLoaded.compareAndSet(false, true)) {
+            return;
+        }
+
         status.setText("Загрузка списка серверов...");
         Task<ServerListResponse> task = new Task<>() {
             @Override
@@ -105,7 +132,8 @@ public class LoginController {
         String pass = password.getText();
         ServerData selectedServer = servers.getSelectionModel().getSelectedItem();
 
-        if (username.isEmpty() || pass.isEmpty() || selectedServer == null) {
+
+        if (username.isBlank() || pass.isEmpty() || selectedServer == null) {
             updateStatus("Заполните все поля и выберите сервер.", true);
             return;
         }
@@ -149,6 +177,7 @@ public class LoginController {
         String errorMsg = "Ошибка сети.";
         if (exception instanceof AuthException authEx) {
             log.warn("AuthException: {}", authEx.getStatus());
+            // TODO: Заменить на более дружелюбные сообщения
             errorMsg = "Ошибка: " + authEx.getStatus();
         } else {
             log.error("Network or IO error", exception);

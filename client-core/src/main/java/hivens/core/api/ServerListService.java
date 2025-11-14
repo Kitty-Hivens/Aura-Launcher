@@ -4,10 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import hivens.config.ServiceEndpoints;
 import hivens.core.data.ServerListResponse;
-import okhttp3.FormBody;
+import okhttp3.HttpUrl; // <-- ИМПОРТ ДОБАВЛЕН
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.RequestBody;
+// import okhttp3.RequestBody; // <-- УДАЛЕНО
+// import okhttp3.FormBody; // <-- УДАЛЕНО
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import org.slf4j.Logger;
@@ -24,8 +25,7 @@ public class ServerListService implements IServerListService {
 
     private static final Logger log = LoggerFactory.getLogger(ServerListService.class);
 
-    // (Гипотеза на основе as.java: 'action' для получения списка серверов)
-    private static final String ACTION_NAME = "servers"; 
+    private static final String ACTION_NAME = "servers";
 
     private final OkHttpClient client;
     private final Gson gson;
@@ -40,26 +40,27 @@ public class ServerListService implements IServerListService {
      */
     @Override
     public ServerListResponse getServerList() throws IOException {
-        
-        // 1. Создание FormBody (внешний контейнер)
-        // (Отправляем только action, json не нужен)
-        RequestBody body = new FormBody.Builder()
-                .add("action", ACTION_NAME)
+
+        // 1. ИСПРАВЛЕНИЕ: Собираем URL с GET-параметром ?action=servers
+        HttpUrl url = Objects.requireNonNull(HttpUrl.parse(ServiceEndpoints.LAUNCHER_API))
+                .newBuilder()
+                .addQueryParameter("action", ACTION_NAME)
+                // .addQueryParameter("json", "{}") // (Пока не добавляем)
                 .build();
 
         // 2. Сборка OkHttp Request
         Request request = new Request.Builder()
-                .url(ServiceEndpoints.AUTH_LOGIN) // (Используем тот же эндпоинт, что и Auth)
-                .post(body)
-                .header("User-Agent", "SMARTYlauncher/3.6.2")
+                .url(url) // Используем собранный URL
+                .get() // <-- ИСПРАВЛЕНИЕ: Меняем POST на GET
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36")
                 .header("Accept", "application/json")
                 .build();
-        
-        log.debug("Executing POST to {} (Action: {})", ServiceEndpoints.AUTH_LOGIN, ACTION_NAME);
+
+        log.debug("Executing GET to {} (Action: {})", url, ACTION_NAME);
 
         // 3. Выполнение запроса
         try (Response response = client.newCall(request).execute()) {
-            
+
             ResponseBody responseBody = response.body();
 
             if (!response.isSuccessful() || responseBody == null) {

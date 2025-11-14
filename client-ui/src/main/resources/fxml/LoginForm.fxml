@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
-<?import javafx.scene.layout.*?>
-<VBox alignment="CENTER" maxHeight="450.0" maxWidth="350.0" spacing="15.0" styleClass="root-pane" stylesheets="@style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1">
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox alignment="CENTER" maxHeight="450.0" maxWidth="350.0" spacing="15.0" styleClass="root-pane" stylesheets="@style.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
     <padding>
         <Insets bottom="30.0" left="30.0" right="30.0" top="20.0" />
     </padding>
@@ -34,7 +40,7 @@
 
         <Label fx:id="status" styleClass="label-error" text="" />
 
-        <Button fx:id="enter" maxWidth="Infinity" onMouseClicked="#onLoginClick" styleClass="btn, btn-accent" text="Войти в игру" />
-        <Button fx:id="settings" maxWidth="Infinity" onMouseClicked="#onSettingsClick" styleClass="btn, btn-secondary" text="Настройки" />
+        <Button fx:id="enter" maxWidth="Infinity" onAction="#onLoginClick" styleClass="btn, btn-accent" text="Войти в игру" />
+        <Button fx:id="settings" maxWidth="Infinity" onAction="#onSettingsClick" styleClass="btn, btn-secondary" text="Настройки" />
     </children>
 </VBox>

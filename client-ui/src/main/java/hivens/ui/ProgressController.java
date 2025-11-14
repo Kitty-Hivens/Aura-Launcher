@@ -9,57 +9,69 @@ import org.slf4j.LoggerFactory;
 /**
  * Контроллер для Progress.fxml.
  * Отвечает за привязку UI к фоновой задаче UpdateAndLaunchTask.
- * (Аналог aa.class)
  */
 public class ProgressController {
 
     private static final Logger log = LoggerFactory.getLogger(ProgressController.class);
 
-    // FXML Поля (ID должны совпадать с Progress.fxml)
     @FXML private ProgressBar progressBar;
-    @FXML private Label master; // (На основе aa.class: "prepare.checkingFiles")
-    @FXML private Label description; // (На основе aa.class: "prepare.updateClient.downloading")
-    @FXML private Label progress; // (На основе aa.class: "progress.master.checkClient")
+    @FXML private Label master;
+    @FXML private Label description;
+    @FXML private Label progress;
+
+    private UpdateAndLaunchTask task;
     private final Main mainApp;
 
+    // ИСПРАВЛЕНИЕ: Добавлен конструктор, принимающий Main
     public ProgressController(Main mainApp) {
         this.mainApp = mainApp;
     }
 
-    private UpdateAndLaunchTask task;
-
     /**
-     * Метод, вызываемый LoginController (или Main) для запуска всего процесса.
-     *
+     * Метод, вызываемый Main для запуска всего процесса.
      * @param task Сконфигурированная фоновая задача (Оркестратор).
+     * @param taskThread Поток, в котором будет выполняться задача (для прерывания).
      */
-    public void startProcess(UpdateAndLaunchTask task) {
+    public void startProcess(UpdateAndLaunchTask task, Thread taskThread) {
         this.task = task;
 
-        // Привязываем UI к свойствам задачи (Task)
-        // (Используем description и progress, как в aa.class)
-        description.textProperty().bind(task.messageProperty()); 
-        progress.textProperty().bind(task.titleProperty()); // (Или наоборот, в зависимости от FXML)
+        // Привязываем UI к свойствам задачи
+        description.textProperty().bind(task.messageProperty());
+        master.textProperty().bind(task.titleProperty()); // Используем 'master' для главного статуса
         progressBar.progressProperty().bind(task.progressProperty());
 
+        // (progress (Label) будет обновляться через Platform.runLater из задачи)
+
         task.setOnSucceeded(e -> {
-            // Успешный запуск (аналог case 7 в aa.class)
             log.info("UpdateAndLaunchTask Succeeded. Process started.");
-            description.textProperty().unbind();
+            unbindProperties();
             description.setText("Клиент запущен.");
-            // TODO: Скрыть окно (Launcher.a.n() в aa.class)
+            mainApp.hideWindow(); // Скрываем окно
         });
 
         task.setOnFailed(e -> {
-            // Ошибка (аналог case 9 в aa.class)
             Throwable ex = task.getException();
             log.error("UpdateAndLaunchTask Failed", ex);
-            description.textProperty().unbind();
+
+            unbindProperties();
+
+            master.textProperty().unbind(); // Также отвязываем
+            master.setText("Ошибка!");
             description.setText("Ошибка: " + ex.getMessage());
-            // TODO: Показать кнопку "Назад" или "Отправить отчет"
+            // TODO: Показать кнопку "Назад"
         });
 
-        // Запускаем задачу в новом потоке
-        new Thread(task).start();
+        // Запускаем задачу в потоке, управляемом Main
+        taskThread.start();
+    }
+
+    /**
+     * Во избежание утечек памяти.
+     */
+    private void unbindProperties() {
+        description.textProperty().unbind();
+        master.textProperty().unbind();
+        progress.textProperty().unbind();
+        progressBar.progressProperty().unbind();
     }
 }

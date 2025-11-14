@@ -20,16 +20,13 @@ import java.util.stream.Collectors;
 
 /**
  * Реализация сервиса запуска клиента (на основе ai.class).
- * Использует hardcoded "Launch Factory" на основе версии клиента.
  */
 public class LauncherService implements ILauncherService {
 
     private static final Logger log = LoggerFactory.getLogger(LauncherService.class);
     private final IManifestProcessorService manifestProcessor;
 
-    /**
-     * Внутренний record для хранения hardcoded конфигураций запуска.
-     */
+    // ... (record LaunchConfig) ...
     private record LaunchConfig(
             String mainClass,
             String tweakClass, // (Может быть null)
@@ -40,18 +37,11 @@ public class LauncherService implements ILauncherService {
 
     private final Map<String, LaunchConfig> launchConfigs;
 
-    /**
-     * DI-Конструктор.
-     * @param manifestProcessor Сервис для "выпрямления" FileManifest
-     */
     public LauncherService(IManifestProcessorService manifestProcessor) {
         this.manifestProcessor = Objects.requireNonNull(manifestProcessor, "ManifestProcessorService cannot be null");
         this.launchConfigs = buildLaunchConfigMap();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Process launchClient(
             SessionData sessionData,
@@ -61,10 +51,10 @@ public class LauncherService implements ILauncherService {
             int allocatedMemoryMB
     ) throws IOException {
 
+        // ... (проверки) ...
         Objects.requireNonNull(sessionData, "SessionData cannot be null");
         Objects.requireNonNull(serverData, "ServerData cannot be null");
 
-        // 1. Получаем конфигурацию запуска
         LaunchConfig config = launchConfigs.get(serverData.version());
         if (config == null) {
             log.error("Missing hardcoded LaunchConfig for version: {}. Aborting.", serverData.version());
@@ -76,8 +66,7 @@ public class LauncherService implements ILauncherService {
 
         // 2. Аргументы JVM
         command.addAll(config.jvmArgs());
-        // Добавляем динамическую память (из ai.class)
-        command.add("-Xms512M"); // (Hardcoded в ai.class)
+        command.add("-Xms512M");
         command.add("-Xmx" + allocatedMemoryMB + "M");
         command.add(buildNativesPath(clientRootPath, config.nativesDir()));
 
@@ -88,7 +77,7 @@ public class LauncherService implements ILauncherService {
         // 4. Главный класс
         command.add(config.mainClass());
 
-        // 5. Аргументы Minecraft (Динамические)
+        // 5. Аргументы Minecraft
         command.addAll(buildMinecraftArgs(sessionData, serverData, clientRootPath, config.assetIndex()));
 
         // 6. TweakClass
@@ -109,16 +98,10 @@ public class LauncherService implements ILauncherService {
         return pb.start();
     }
 
-    /**
-     * Имитирует switch-блок из ai.class, храня hardcoded данные.
-     * (Оптимизировано: Устаревшие CMS GC заменены на G1GC)
-     */
+    // ... (buildLaunchConfigMap) ...
     private Map<String, LaunchConfig> buildLaunchConfigMap() {
-
-        // --- 1.7.10 (Case 4) ---
-
-        // TODO: Добавить 1.16.5 (Case 1) и 1.18.2 (Case 2)
-
+        // ... (Тот же код, что и в оригинале) ...
+        // (Оставил твой Map.of(...) как есть)
         return Map.of("1.7.10", new LaunchConfig(
                         "net.minecraft.launchwrapper.Launch", // mainClass
                         "cpw.mods.fml.common.launcher.FMLTweaker", // tweakClass
@@ -135,8 +118,6 @@ public class LauncherService implements ILauncherService {
                         ),
                         "bin/natives-1.7.10" // (Предположение)
                 ),
-
-                // --- 1.12.2 (Case 0) ---
                 "1.12.2", new LaunchConfig(
                         "net.minecraft.launchwrapper.Launch", // mainClass
                         "net.minecraftforge.fml.common.launcher.FMLTweaker", // tweakClass
@@ -153,8 +134,6 @@ public class LauncherService implements ILauncherService {
                         ),
                         "bin/natives-1.12.2" // (На основе strace)
                 ),
-
-                // --- 1.21.1 (Case 3) ---
                 "1.21.1", new LaunchConfig(
                         "cpw.mods.bootstraplauncher.BootstrapLauncher", // mainClass
                         null, // tweakClass
@@ -166,7 +145,6 @@ public class LauncherService implements ILauncherService {
                                 "-Dminecraft.launcher.brand=smartycraft",
                                 "-Dminecraft.launcher.version=3.6.2",
                                 "-Djava.net.preferIPv6Addresses=system",
-                                // (Пропускаем dignoreList/dmergeModules/p - это для BootstrapLauncher 1.18)
                                 "--add-modules", "ALL-MODULE-PATH",
                                 "--add-opens", "java.base/java.util.jar=cpw.mods.securejarhandler",
                                 "--add-opens", "java.base/java.lang.invoke=cpw.mods.securejarhandler",
@@ -187,13 +165,8 @@ public class LauncherService implements ILauncherService {
                 ));
     }
 
-    /**
-     * Собирает Classpath, используя ManifestProcessorService.
-     */
     private String buildClasspath(Path clientRootPath, FileManifest manifest) {
         String separator = File.pathSeparator;
-
-        // Используем сервис Issue #15 для получения плоской карты
         Map<String, FileData> flatMap = manifestProcessor.flattenManifest(manifest);
 
         return flatMap.keySet().stream()
@@ -204,7 +177,8 @@ public class LauncherService implements ILauncherService {
     }
 
     private String buildNativesPath(Path clientRootPath, String nativesDir) {
-        return "-Djava.library.path=" + clientRootPath.resolve(nativesDir).toString();
+        String nativePath = clientRootPath.resolve(nativesDir).toString().replace("\\", "/");
+        return "-Djava.library.path=" + nativePath;
     }
 
     private List<String> buildMinecraftArgs(SessionData sessionData, ServerData serverData, Path clientRootPath, String assetIndex) {

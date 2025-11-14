@@ -27,6 +27,9 @@ public class Main extends Application {
     private LauncherDI container;
     private Stage primaryStage;
 
+
+    private Thread updateThread;
+
     @Override
     public void init() {
         this.container = new LauncherDI();
@@ -44,13 +47,10 @@ public class Main extends Application {
     public void showLoginScene() throws IOException {
         FXMLLoader loader = loadFXML("LoginForm.fxml");
 
-        loader.setControllerFactory(controllerClass -> {
-            if (controllerClass == LoginController.class) {
-                // Внедряем DI и 'this' (Main) для управления сценами
-                return new LoginController(container, this);
-            }
-            return createController(controllerClass);
-        });
+        LoginController controller = new LoginController(container, this);
+        loader.setController(controller);
+
+        // loader.setControllerFactory(...);
 
         Parent root = loader.load();
         primaryStage.setTitle("SCOL - Вход");
@@ -75,14 +75,18 @@ public class Main extends Application {
 
         loader.setControllerFactory(controllerClass -> {
             if (controllerClass == ProgressController.class) {
-                return new ProgressController(this); // (Передаем Main)
+                return new ProgressController(this);
             }
             return createController(controllerClass);
         });
 
         Parent root = loader.load();
         ProgressController controller = loader.getController();
-        controller.startProcess(task); // Запускаем!
+
+
+        this.updateThread = new Thread(task);
+        this.updateThread.setDaemon(true); // Чтобы не блокировал выход
+        controller.startProcess(task, this.updateThread); // Запускаем!
 
         primaryStage.setTitle("SCOL - Запуск...");
         primaryStage.setScene(new Scene(root));
@@ -111,6 +115,18 @@ public class Main extends Application {
      */
     public void hideWindow() {
         Platform.runLater(primaryStage::hide);
+    }
+
+    /**
+     * Вызывается при закрытии окна
+     */
+    @Override
+    public void stop() {
+        log.info("Stopping application...");
+        if (updateThread != null && updateThread.isAlive()) {
+            log.info("Interrupting update/download thread.");
+            updateThread.interrupt(); // Прерываем загрузку/проверку
+        }
     }
 
     // --- Вспомогательные методы ---
