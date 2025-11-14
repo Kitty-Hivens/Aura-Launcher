@@ -1,34 +1,30 @@
 package hivens.core.data;
 
 import com.google.gson.annotations.SerializedName;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 /**
- * Модель данных сессии, возвращаемая после успешной аутентификации.
+ * Модель данных сессии (DTO), преобразованная в Java Record.
  * Содержит все необходимые данные для запуска клиента.
  */
-@Data
-@NoArgsConstructor
-public class SessionData {
+public record SessionData(
 
-    /** Статус ответа (должен быть AuthStatus.OK). */
-    @SerializedName("status")
-    private AuthStatus status;
-    
-    /** Имя игрока. */
-    @SerializedName("playername")
-    private String playerName; 
-    
-    /** Уникальный идентификатор игрока (UUID). */
-    @SerializedName("uuid")
-    private String uuid; 
-    
-    /** Токен доступа (accessToken) для запуска Minecraft. */
-    @SerializedName("session") 
-    private String accessToken; 
+        /* Статус ответа (должен быть AuthStatus.OK). */
+        @SerializedName("status")
+        AuthStatus status,
 
-    /** Информация о текущем клиенте и модах (вложенный объект). */
-    @SerializedName("client")
-    private ClientData clientData;
-}
+        /* Имя игрока. */
+        @SerializedName("playername")
+        String playerName,
+
+        /* Уникальный идентификатор игрока (UUID). */
+        @SerializedName("uuid")
+        String uuid,
+
+        /* Токен доступа (accessToken) для запуска Minecraft. */
+        @SerializedName("session")
+        String accessToken,
+
+        /* Информация о текущем клиенте и модах (вложенный объект). */
+        @SerializedName("client")
+        ClientData clientData
+) {}
