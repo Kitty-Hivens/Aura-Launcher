@@ -29,6 +29,7 @@ public class LauncherDI {
     private final IFileDownloadService downloadService;
     private final IManifestProcessorService manifestProcessorService;
     private final ILauncherService launcherService;
+    private final IServerListService serverListService;
 
     public LauncherDI() {
         // 1. Инициализация базовых зависимостей
@@ -36,7 +37,7 @@ public class LauncherDI {
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(30))
                 .build();
-        
+
         this.gson = new GsonBuilder().create();
 
         // 2. Инициализация сервисов (внедрение зависимостей)
@@ -45,5 +46,6 @@ public class LauncherDI {
         this.downloadService = new FileDownloadService(httpClient);
         this.manifestProcessorService = new ManifestProcessorService();
         this.launcherService = new LauncherService(manifestProcessorService);
+        this.serverListService = new ServerListService(httpClient, gson);
     }
 }
