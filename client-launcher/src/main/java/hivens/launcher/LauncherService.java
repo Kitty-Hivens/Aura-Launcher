@@ -17,27 +17,21 @@ import java.util.stream.Collectors;
 
 /**
  * Реализация сервиса запуска клиента Minecraft.
- * Использует ProcessBuilder для создания процесса на основе данных из API и strace.
+ * Использует ProcessBuilder и ClientData для data-driven запуска.
  */
 public class LauncherService implements ILauncherService {
 
     private static final Logger log = LoggerFactory.getLogger(LauncherService.class);
 
-    // Главный класс, определенный в strace (net.minecraft.launchwrapper.Launch)
-    private static final String MAIN_CLASS = "net.minecraft.launchwrapper.Launch";
-    // TweakClass, определенный в strace
-    private static final String TWEAK_CLASS = "net.minecraftforge.fml.common.launcher.FMLTweaker";
-
     /**
      * {@inheritDoc}
-     * <p>
-     * Собирает команду, очищая устаревшие флаги JVM.
      */
     @Override
     public Process launchClient(SessionData sessionData, ClientData clientData, Path clientRootPath, Path javaExecutablePath) throws IOException {
-        
+
         Objects.requireNonNull(sessionData, "SessionData cannot be null");
         Objects.requireNonNull(clientData, "ClientData cannot be null");
+        Objects.requireNonNull(clientData.mainClass(), "ClientData 'mainClass' cannot be null");
         Objects.requireNonNull(clientRootPath, "Client root path cannot be null");
         Objects.requireNonNull(javaExecutablePath, "Java executable path cannot be null");
 
@@ -47,37 +41,40 @@ public class LauncherService implements ILauncherService {
         command.add(javaExecutablePath.toString());
 
         // 2. Аргументы JVM
-        // Используем аргументы из API, если они есть
         if (clientData.jvmArguments() != null) {
             command.addAll(filterJvmArgs(clientData.jvmArguments()));
         }
 
-        // 3. Classpath (Путь к библиотекам)
+        // 3. Classpath
         command.add("-cp");
         command.add(buildClasspath(clientRootPath, clientData.filesWithHashes()));
 
-        // 4. Главный класс
-        command.add(MAIN_CLASS);
+        // 4. Главный класс (из API)
+        command.add(clientData.mainClass());
 
-        // 5. Аргументы Minecraft (на основе strace и SessionData)
-        command.addAll(buildMinecraftArgs(sessionData, clientRootPath));
-        
+        // 5. Аргументы Minecraft (на основе SessionData)
+        command.addAll(buildMinecraftArgs(sessionData, clientData, clientRootPath));
+
         // 6. Дополнительные аргументы Minecraft (TweakClass, из API)
-        command.add("--tweakClass");
-        command.add(TWEAK_CLASS);
-        
+        if (clientData.tweakClass() != null && !clientData.tweakClass().isEmpty()) {
+            command.add("--tweakClass");
+            command.add(clientData.tweakClass());
+        }
+
+        // 7. Дополнительные аргументы (из API)
         if (clientData.mcArguments() != null) {
             command.addAll(clientData.mcArguments());
         }
 
         log.debug("Assembled launch command: {}", String.join(" ", command));
 
-        // 7. Запуск процесса
+        // 8. Запуск процесса
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(clientRootPath.toFile()); // Устанавливаем рабочую директорию
         pb.inheritIO(); // Перенаправляем stdout/stderr клиента в консоль лаунчера
 
-        log.info("Launching client process for user {}...", sessionData.playerName());
+        log.info("Launching client process for user {} (Version: {})...",
+                sessionData.playerName(), clientData.versionId());
         return pb.start();
     }
 
@@ -86,7 +83,7 @@ public class LauncherService implements ILauncherService {
      */
     private List<String> filterJvmArgs(List<String> jvmArgs) {
         return jvmArgs.stream()
-                // Отбрасываем устаревшие флаги CMS GC (причина сбоя на Linux)
+                // Отбрасываем устаревшие флаги CMS GC
                 .filter(arg -> !arg.contains("UseConcMarkSweepGC"))
                 .filter(arg -> !arg.contains("CMSIncrementalMode"))
                 // Отбрасываем мусорный флаг для Windows
@@ -96,48 +93,40 @@ public class LauncherService implements ILauncherService {
 
     /**
      * Собирает Classpath на основе карты файлов.
-     * (Оптимизация: предполагает, что все файлы в /libraries-1.12.2)
+     * ПРИМЕЧАНИЕ: Эта реализация все еще хрупкая и является тех. долгом.
+     * Она предполагает, что все .jar файлы из filesWithHashes должны быть в classpath.
      */
     private String buildClasspath(Path clientRootPath, Map<String, String> files) {
-        // Определение разделителя Classpath (:) для Linux/Mac, (;) для Windows
         String separator = File.pathSeparator;
 
-        // (Упрощенная реализация: предполагает, что все нужные JAR лежат в /libraries-1.12.2)
-        // ВАЖНО: В strace было видно много JAR. В идеале, ClientData должен предоставлять
-        // список только тех файлов, которые идут в classpath.
-        // На данный момент мы должны воссоздать его на основе filesWithHashes.
-        
-        // Эта реализация должна быть уточнена, когда мы будем знать,
-        // как ClientData.filesWithHashes отличает библиотеки от модов.
-        // Пока мы предполагаем, что он содержит все, что нужно.
+        if (files == null || files.isEmpty()) {
+            log.warn("Classpath is empty! ClientData.filesWithHashes is null or empty.");
+            return "";
+        }
 
-        Path libPath = clientRootPath.resolve("libraries-1.12.2"); // На основе strace
-
+        // Эта логика предполагает, что 'filesWithHashes' содержит относительные пути
+        // (e.g., "libraries/log4j.jar", "mods/mod.jar", "client-1.12.2.jar")
         return files.keySet().stream()
                 .filter(file -> file.endsWith(".jar"))
-                .map(file -> libPath.resolve(file).toString()) // Примерный путь
+                .map(clientRootPath::resolve)
+                .map(Path::toString)
                 .collect(Collectors.joining(separator));
-        
-        // ПРИМЕЧАНИЕ: Если ClientData.filesWithHashes содержит полные пути
-        // (например, "libraries-1.12.2/mod.jar"), эта логика должна быть изменена
-        // на return files.keySet().stream()...collect(Collectors.joining(separator));
     }
 
     /**
-     * Собирает основные аргументы Minecraft на основе данных сессии.
-     * (Все эти флаги были взяты из strace)
+     * Собирает основные аргументы Minecraft на основе данных сессии и клиента.
      */
-    private List<String> buildMinecraftArgs(SessionData sessionData, Path clientRootPath) {
+    private List<String> buildMinecraftArgs(SessionData sessionData, ClientData clientData, Path clientRootPath) {
         // Используем List.of() для неизменяемого списка
         return List.of(
                 "--username", sessionData.playerName(),
-                "--version", "Forge 1.12.2", // (Взято из strace, должно быть динамическим)
+                "--version", clientData.versionId(), // Используем версию из API
                 "--gameDir", clientRootPath.toString(),
-                "--assetsDir", clientRootPath.resolve("assets-1.12.2").toString(), // (На основе strace)
+                "--assetsDir", clientRootPath.resolve("assets").toString(), // (Упрощено, API должно давать 'assetsDir')
                 "--uuid", sessionData.uuid(),
                 "--accessToken", sessionData.accessToken(),
                 "--userProperties", "{}",
-                "--assetIndex", "1.12.2" // (На основе strace)
+                "--assetIndex", clientData.assetIndex() // Используем assetIndex из API
         );
     }
 }
