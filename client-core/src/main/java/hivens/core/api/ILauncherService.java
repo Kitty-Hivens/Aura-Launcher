@@ -16,7 +16,7 @@ public interface ILauncherService {
      *
      * @param sessionData Данные сессии (accessToken, uuid, playerName).
      * @param serverData Данные о выбранном сервере (версия, имя).
-     * @param clientRootPath Абсолютный путь к корню клиента (например, /home/user/.smarty).
+     * @param clientRootPath Абсолютный путь к корню клиента.
      * @param javaExecutablePath Абсолютный путь к исполняемому файлу java.
      * @return Запущенный процесс (Process) для мониторинга.
      * @throws IOException в случае ошибки I/O при запуске.
