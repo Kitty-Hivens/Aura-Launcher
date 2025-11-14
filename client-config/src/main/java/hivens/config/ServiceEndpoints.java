@@ -20,5 +20,5 @@ public final class ServiceEndpoints {
     public static final String AUTH_LOGIN = BASE_URL + "/auth/login";
     
     // NOTE: По мере необходимости сюда будут добавляться другие эндпоинты,
-    // например, для списка клиентов или проверки хешей.
+    // например, для списка клиентов или проверки хешей
 }
