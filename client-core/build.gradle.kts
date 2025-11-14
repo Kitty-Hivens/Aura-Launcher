@@ -1,0 +1,13 @@
+dependencies {
+    implementation(project(":client-config"))
+
+    // HTTP-клиент
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // JSON-маппинг
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    // Lombok
+    compileOnly("org.projectlombok:lombok:1.18.30")
+    annotationProcessor("org.projectlombok:lombok:1.18.30")
+}
