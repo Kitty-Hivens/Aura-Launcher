@@ -1,36 +1,28 @@
 package hivens.core.data;
 
 import com.google.gson.annotations.SerializedName;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.util.List;
 import java.util.Map;
 
 /**
- * Модель конфигурации клиента, содержащая информацию о модах и аргументах запуска.
+ * Модель конфигурации клиента (DTO), преобразованная в Java Record.
  * Аналог объекта 'client' в ответе API.
  */
-@Data
-@NoArgsConstructor
-public class ClientData {
-    
-    /** Версия клиента (например, "1.12.2-Custom"). */
-    @SerializedName("id")
-    private String versionId;
+public record ClientData(
 
-    /** Список аргументов JVM для запуска Minecraft. */
-    @SerializedName("jvmArguments")
-    private List<String> jvmArguments;
+        /* Версия клиента (например, "1.12.2-Custom"). */
+        @SerializedName("id")
+        String versionId,
 
-    /** Список аргументов Minecraft. */
-    @SerializedName("mcArguments")
-    private List<String> mcArguments;
+        /* Список аргументов JVM для запуска Minecraft. */
+        @SerializedName("jvmArguments")
+        List<String> jvmArguments,
 
-    /** Список файлов/модов, которые необходимо загрузить/проверить.
-     * Ключ: путь/имя файла, Значение: ожидаемый MD5/SHA хэш.
-     * NOTE: Используется Map<String, String> для минималистичного маппинга JSON.
-     */
-    @SerializedName("mods")
-    private Map<String, String> filesWithHashes;
-}
+        /* Список аргументов Minecraft. */
+        @SerializedName("mcArguments")
+        List<String> mcArguments,
+
+        /* Список файлов/модов, которые необходимо загрузить/проверить. */
+        @SerializedName("mods")
+        Map<String, String> filesWithHashes
+) {}
