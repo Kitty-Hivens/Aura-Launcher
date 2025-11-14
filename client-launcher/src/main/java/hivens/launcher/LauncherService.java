@@ -181,7 +181,6 @@ public class LauncherService implements ILauncherService {
                                 "-Dfml.ignoreInvalidMinecraftCertificates=true",
                                 "-Dfml.ignorePatchDiscrepancies=true",
                                 "-Djava.net.preferIPv4Stack=true",
-                                // (Пропускаем dminecraft.api.* - это для внутриигрового API)
                                 "-Dminecraft.api.env=smartycraft"
                         ),
                         "bin/natives-1.21.1" // (Предположение на основе ai.class)
