@@ -18,7 +18,11 @@ public final class ServiceEndpoints {
 
     /** Endpoint для аутентификации пользователя (POST). */
     public static final String AUTH_LOGIN = BASE_URL + "/auth/login";
+
     
+    /** * Базовый путь на CDN для загрузки файлов клиента (моды, библиотеки). */
+    public static final String CLIENT_DOWNLOAD_BASE = BASE_URL + "/launcher/clients/";
+
     // NOTE: По мере необходимости сюда будут добавляться другие эндпоинты,
     // например, для списка клиентов или проверки хешей
 }
