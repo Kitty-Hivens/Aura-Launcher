@@ -20,6 +20,11 @@ public class ProgressController {
     @FXML private Label master; // (На основе aa.class: "prepare.checkingFiles")
     @FXML private Label description; // (На основе aa.class: "prepare.updateClient.downloading")
     @FXML private Label progress; // (На основе aa.class: "progress.master.checkClient")
+    private final Main mainApp;
+
+    public ProgressController(Main mainApp) {
+        this.mainApp = mainApp;
+    }
 
     private UpdateAndLaunchTask task;
 

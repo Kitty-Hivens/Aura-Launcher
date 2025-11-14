@@ -1,62 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.String?>
-<?import javafx.scene.Cursor?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.ComboBox?>
-<?import javafx.scene.control.Hyperlink?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.PasswordField?>
-<?import javafx.scene.control.TextField?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.*?>
+<VBox alignment="CENTER" maxHeight="450.0" maxWidth="350.0" spacing="15.0" styleClass="root-pane" stylesheets="@style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1">
+    <padding>
+        <Insets bottom="30.0" left="30.0" right="30.0" top="20.0" />
+    </padding>
+    <children>
+        <ImageView fitHeight="60.0" pickOnBounds="true" preserveRatio="true">
+            <image>
+                <Image url="@/images/logo.png" />
+            </image>
+        </ImageView>
+        <Label styleClass="label-title" text="Вход в SCOL" />
 
-<AnchorPane id="AnchorPane" prefHeight="430.0" prefWidth="250.0" stylesheets="@style.css" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="n">
-   <children>
-      <TextField fx:id="login" layoutX="76.0" layoutY="183.0" prefHeight="36.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="155.0">
-         <styleClass>
-            <String fx:value="input" />
-            <String fx:value="input--name" />
-         </styleClass></TextField>
-      <PasswordField fx:id="password" layoutX="76.0" layoutY="221.0" prefHeight="36.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="198.0">
-         <styleClass>
-            <String fx:value="input" />
-            <String fx:value="input--password" />
-         </styleClass></PasswordField>
-      <ComboBox fx:id="servers" layoutX="76.0" layoutY="259.0" onAction="#serverSelect" prefHeight="30.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="268.0">
-         <cursor>
-            <Cursor fx:constant="HAND" />
-         </cursor></ComboBox>
-      <Button fx:id="enter" layoutX="76.0" layoutY="299.0" mnemonicParsing="false" onMouseClicked="#clickLogin" prefHeight="35.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="35.0" AnchorPane.topAnchor="360.0">
-         <styleClass>
-            <String fx:value="btn" />
-            <String fx:value="btn--left" />
-            <String fx:value="btn--green" />
-         </styleClass>
-         <cursor>
-            <Cursor fx:constant="HAND" />
-         </cursor></Button>
-      <Button fx:id="settings" layoutX="234.0" layoutY="299.0" mnemonicParsing="false" onMouseClicked="#clickSettings" prefHeight="35.0" prefWidth="35.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="360.0">
-         <styleClass>
-            <String fx:value="btn" />
-            <String fx:value="btn--right" />
-            <String fx:value="btn--settings" />
-            <String fx:value="btn--green" />
-         </styleClass>
-         <cursor>
-            <Cursor fx:constant="HAND" />
-         </cursor></Button>
-      <Label fx:id="status" alignment="CENTER" layoutY="340.0" prefHeight="40.0" styleClass="login__status" textAlignment="CENTER" wrapText="true" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="320.0" />
-      <VBox alignment="CENTER" prefHeight="32.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="236.0">
-         <children>
-            <Hyperlink fx:id="passwordRestore" onMouseClicked="#clickPasswordRestore" alignment="CENTER" contentDisplay="CENTER" styleClass="login__restorepassword" textAlignment="CENTER" />
-         </children>
-      </VBox>
-      <ImageView fx:id="logotype" fitHeight="60.0" fitWidth="250.0" layoutX="25.0" layoutY="8.0" onMouseClicked="#clickLogo" pickOnBounds="true" preserveRatio="true" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="30.0">
-         <cursor>
-            <Cursor fx:constant="HAND" />
-         </cursor></ImageView>
-      <Label fx:id="description" alignment="CENTER" layoutX="111.0" layoutY="139.0" styleClass="login__desc" textAlignment="CENTER" wrapText="true" AnchorPane.bottomAnchor="287.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
-   </children>
-</AnchorPane>
+        <VBox spacing="10.0">
+            <Label styleClass="label-subtitle" text="Логин" />
+            <TextField fx:id="login" promptText="Введите ваш логин" styleClass="text-field" />
+        </VBox>
+
+        <VBox spacing="10.0">
+            <Label styleClass="label-subtitle" text="Пароль" />
+            <PasswordField fx:id="password" promptText="Введите ваш пароль" styleClass="text-field" />
+        </VBox>
+
+        <VBox spacing="10.0" VBox.vgrow="ALWAYS">
+            <Label styleClass="label-subtitle" text="Сервер / Сборка" />
+            <ComboBox fx:id="servers" maxWidth="Infinity" styleClass="combo-box" />
+        </VBox>
+
+        <Label fx:id="status" styleClass="label-error" text="" />
+
+        <Button fx:id="enter" maxWidth="Infinity" onMouseClicked="#onLoginClick" styleClass="btn, btn-accent" text="Войти в игру" />
+        <Button fx:id="settings" maxWidth="Infinity" onMouseClicked="#onSettingsClick" styleClass="btn, btn-secondary" text="Настройки" />
+    </children>
+</VBox>

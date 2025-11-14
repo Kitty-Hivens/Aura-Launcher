@@ -1,6 +1,7 @@
 plugins {
     id("org.openjfx.javafxplugin") version "0.1.0"
     id("org.beryx.jlink") version "3.0.1"
+    id("application")
 }
 
 dependencies {
@@ -15,6 +16,9 @@ dependencies {
 javafx {
     version = "21"
     modules("javafx.controls", "javafx.fxml")
+    application {
+        mainClass.set("hivens.ui.Main")
+    }
 }
 
 jlink {
