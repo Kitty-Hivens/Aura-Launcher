@@ -21,7 +21,7 @@ jlink {
     jpackage {
         // Имя приложения
         launcher {
-            name = "app"
+            name = "SCOL"
         }
 
         // Главный класс (точка входа)
