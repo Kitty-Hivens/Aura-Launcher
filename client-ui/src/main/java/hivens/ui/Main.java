@@ -25,29 +25,31 @@ public class Main extends Application {
 
     @Override
     public void start(Stage primaryStage) throws IOException {
-        // Загружаем первый FXML (LoginForm)
+
         FXMLLoader loader = new FXMLLoader(Objects.requireNonNull(
                 getClass().getResource("/fxml/LoginForm.fxml")
         ));
 
-        // Внедряем DI-контейнер в контроллер (будет создан в следующем коммите)
+        // Внедряем DI-контейнер в контроллер
         loader.setControllerFactory(controllerClass -> {
-            // (Пример того, как мы будем внедрять зависимости в контроллеры)
-            // if (controllerClass == LoginController.class) {
-            //     return new LoginController(container.getAuthService());
-            // }
-            // return new controllerClass(); // Временная заглушка
-            
-            // TODO: Реализовать setControllerFactory в Коммите #3
-            return null; 
+            if (controllerClass == LoginController.class) {
+                // Внедряем DI в конструктор контроллера
+                return new LoginController(this.container);
+            }
+            try {
+                // Стандартное поведение для FXML без DI
+                return controllerClass.getDeclaredConstructor().newInstance();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create controller: " + controllerClass.getName(), e);
+            }
         });
 
-        // Временная заглушка (удалить, когда FXML будет готов)
-        // Parent root = loader.load(); 
-        
-        // primaryStage.setTitle("SCOL");
-        // primaryStage.setScene(new Scene(root, 800, 600));
-        // primaryStage.show();
+        // Загружаем FXML (теперь он найдет контроллер)
+        Parent root = loader.load();
+
+        primaryStage.setTitle("SCOL");
+        primaryStage.setScene(new Scene(root)); // (Размеры возьмутся из FXML)
+        primaryStage.show();
     }
 
     public static void main(String[] args) {
