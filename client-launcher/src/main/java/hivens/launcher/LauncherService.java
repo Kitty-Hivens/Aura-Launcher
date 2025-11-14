@@ -1,7 +1,8 @@
 package hivens.launcher;
 
 import hivens.core.api.ILauncherService;
-import hivens.core.data.ClientData;
+import hivens.core.data.FileManifest; // (Импорт из SessionData)
+import hivens.core.data.ServerData;
 import hivens.core.data.SessionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,103 +10,121 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * Реализация сервиса запуска клиента Minecraft.
- * Использует ProcessBuilder и ClientData для data-driven запуска.
+ * Использует ServerData и hardcoded значения).
  */
 public class LauncherService implements ILauncherService {
 
     private static final Logger log = LoggerFactory.getLogger(LauncherService.class);
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public Process launchClient(SessionData sessionData, ClientData clientData, Path clientRootPath, Path javaExecutablePath) throws IOException {
+    public Process launchClient(SessionData sessionData, ServerData serverData, Path clientRootPath, Path javaExecutablePath) throws IOException {
 
         Objects.requireNonNull(sessionData, "SessionData cannot be null");
-        Objects.requireNonNull(clientData, "ClientData cannot be null");
-        Objects.requireNonNull(clientData.mainClass(), "ClientData 'mainClass' cannot be null");
+        Objects.requireNonNull(serverData, "ServerData cannot be null");
         Objects.requireNonNull(clientRootPath, "Client root path cannot be null");
         Objects.requireNonNull(javaExecutablePath, "Java executable path cannot be null");
 
-        List<String> command = new ArrayList<>();
+        // Определяем параметры запуска на основе версии
+        LaunchConfig config = getLaunchConfig(serverData.version());
 
-        // 1. Исполняемый файл Java
+        List<String> command = new ArrayList<>();
         command.add(javaExecutablePath.toString());
 
-        // 2. Аргументы JVM
-        if (clientData.jvmArguments() != null) {
-            command.addAll(filterJvmArgs(clientData.jvmArguments()));
-        }
+        // Аргументы JVM
+        command.addAll(config.jvmArguments);
+        command.add(getNativesPath(clientRootPath)); // (На основе strace)
 
-        // 3. Classpath
+        // Classpath
         command.add("-cp");
-        command.add(buildClasspath(clientRootPath, clientData.filesWithHashes()));
+        command.add(buildClasspath(clientRootPath, sessionData.fileManifest()));
 
-        // 4. Главный класс (из API)
-        command.add(clientData.mainClass());
+        // Главный класс
+        command.add(config.mainClass);
 
-        // 5. Аргументы Minecraft (на основе SessionData)
-        command.addAll(buildMinecraftArgs(sessionData, clientData, clientRootPath));
+        // Аргументы Minecraft (Динамические)
+        command.addAll(buildMinecraftArgs(sessionData, serverData, clientRootPath, config.assetIndex));
 
-        // 6. Дополнительные аргументы Minecraft (TweakClass, из API)
-        if (clientData.tweakClass() != null && !clientData.tweakClass().isEmpty()) {
+        // TweakClass (если нужен)
+        if (config.tweakClass != null) {
             command.add("--tweakClass");
-            command.add(clientData.tweakClass());
-        }
-
-        // 7. Дополнительные аргументы (из API)
-        if (clientData.mcArguments() != null) {
-            command.addAll(clientData.mcArguments());
+            command.add(config.tweakClass);
         }
 
         log.debug("Assembled launch command: {}", String.join(" ", command));
 
-        // 8. Запуск процесса
+        // Запуск
         ProcessBuilder pb = new ProcessBuilder(command);
-        pb.directory(clientRootPath.toFile()); // Устанавливаем рабочую директорию
-        pb.inheritIO(); // Перенаправляем stdout/stderr клиента в консоль лаунчера
+        pb.directory(clientRootPath.toFile());
+        pb.inheritIO();
 
         log.info("Launching client process for user {} (Version: {})...",
-                sessionData.playerName(), clientData.versionId());
+                sessionData.playerName(), serverData.version());
         return pb.start();
     }
 
     /**
-     * Фильтрует устаревшие или небезопасные аргументы JVM.
+     * Вспомогательный внутренний класс (record) для хранения hardcoded
+     * параметров запуска для разных версий.
      */
-    private List<String> filterJvmArgs(List<String> jvmArgs) {
-        return jvmArgs.stream()
-                // Отбрасываем устаревшие флаги CMS GC
-                .filter(arg -> !arg.contains("UseConcMarkSweepGC"))
-                .filter(arg -> !arg.contains("CMSIncrementalMode"))
-                // Отбрасываем мусорный флаг для Windows
-                .filter(arg -> !arg.contains("ThisTricksIntelDriversForPerformance"))
-                .collect(Collectors.toList());
+    private record LaunchConfig(
+            List<String> jvmArguments,
+            String mainClass,
+            String tweakClass, // (Может быть null)
+            String assetIndex
+    ) {}
+
+    /**
+     * Возвращает hardcoded конфигурацию запуска на основе строки версии.
+     * Мы должны заполнить это на основе strace.
+     */
+    private LaunchConfig getLaunchConfig(String version) {
+        // TODO: Добавить switch/case для 1.7.10 и 1.21.1
+
+        // (Данные из strace для 1.12.2)
+        if (version.contains("1.12.2")) {
+            return new LaunchConfig(
+                    List.of(
+                            "-XX:+UseG1GC",
+                            "-Xmx4096M",
+                            "-Xms512M",
+                            "-Xmn128M"
+                    ),
+                    "net.minecraft.launchwrapper.Launch",
+                    "net.minecraftforge.fml.common.launcher.FMLTweaker",
+                    "1.12.2"
+            );
+        }
+
+        log.warn("Unknown client version: {}. Using default 1.12.2 config.", version);
+        // Возвращаем 1.12.2 по умолчанию
+        return getLaunchConfig("1.12.2");
     }
 
     /**
-     * Собирает Classpath на основе карты файлов.
-     * ПРИМЕЧАНИЕ: Эта реализация все еще хрупкая и является тех. долгом.
-     * Она предполагает, что все .jar файлы из filesWithHashes должны быть в classpath.
+     * Рекурсивно "выпрямляет" FileManifest в плоскую Map<String, String>.
+     * (Это должно быть в ManifestProcessorService, Issue #13)
      */
-    private String buildClasspath(Path clientRootPath, Map<String, String> files) {
+    private Map<String, String> flattenManifest(FileManifest manifest) {
+        Map<String, String> flatMap = new HashMap<>();
+        if (manifest == null) return flatMap;
+
+        // TODO: Реализовать рекурсивный обход 'manifest.directories()'
+        // и 'manifest.files()' для сбора всех путей и md5.
+
+        // Эта логика критически важна для Classpath и IntegrityCheck.
+
+        return flatMap;
+    }
+
+    private String buildClasspath(Path clientRootPath, FileManifest manifest) {
         String separator = File.pathSeparator;
+        Map<String, String> files = flattenManifest(manifest);
 
-        if (files == null || files.isEmpty()) {
-            log.warn("Classpath is empty! ClientData.filesWithHashes is null or empty.");
-            return "";
-        }
-
-        // Эта логика предполагает, что 'filesWithHashes' содержит относительные пути
-        // (e.g., "libraries/log4j.jar", "mods/mod.jar", "client-1.12.2.jar")
         return files.keySet().stream()
                 .filter(file -> file.endsWith(".jar"))
                 .map(clientRootPath::resolve)
@@ -113,20 +132,21 @@ public class LauncherService implements ILauncherService {
                 .collect(Collectors.joining(separator));
     }
 
-    /**
-     * Собирает основные аргументы Minecraft на основе данных сессии и клиента.
-     */
-    private List<String> buildMinecraftArgs(SessionData sessionData, ClientData clientData, Path clientRootPath) {
-        // Используем List.of() для неизменяемого списка
+    private String getNativesPath(Path clientRootPath) {
+        // (На основе strace)
+        return "-Djava.library.path=" + clientRootPath.resolve("bin/natives-1.12.2");
+    }
+
+    private List<String> buildMinecraftArgs(SessionData sessionData, ServerData serverData, Path clientRootPath, String assetIndex) {
         return List.of(
                 "--username", sessionData.playerName(),
-                "--version", clientData.versionId(), // Используем версию из API
+                "--version", serverData.version(),
                 "--gameDir", clientRootPath.toString(),
-                "--assetsDir", clientRootPath.resolve("assets").toString(), // (Упрощено, API должно давать 'assetsDir')
+                "--assetsDir", clientRootPath.resolve("assets").toString(),
                 "--uuid", sessionData.uuid(),
                 "--accessToken", sessionData.accessToken(),
                 "--userProperties", "{}",
-                "--assetIndex", clientData.assetIndex() // Используем assetIndex из API
+                "--assetIndex", assetIndex
         );
     }
 }
