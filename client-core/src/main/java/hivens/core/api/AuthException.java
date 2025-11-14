@@ -1,7 +1,6 @@
 package hivens.core.api;
 
 import hivens.core.data.AuthStatus;
-
 import java.io.Serial;
 
 /**
