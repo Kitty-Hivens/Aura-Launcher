@@ -5,7 +5,7 @@ import com.google.gson.JsonSyntaxException;
 import hivens.config.ServiceEndpoints;
 import hivens.core.data.AuthStatus;
 import hivens.core.data.SessionData;
-import okhttp3.MediaType;
+import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -20,23 +20,19 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Синхронная реализация сервиса аутентификации на основе OkHttp и Gson.
- * Выполняет сетевой запрос и маппинг ответа на SessionData.
+ * Синхронная реализация сервиса аутентификации.
+ * Исправлено: Отправляет application/x-www-form-urlencoded.
  */
 public class AuthService implements IAuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
-    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-    // Зависимости внедряются через конструктор (DI)
+    // "auth" - наиболее вероятное значение для авторизации.
+    private static final String ACTION_NAME = "auth";
+
     private final OkHttpClient client;
     private final Gson gson;
 
-    /**
-     * Инициализирует сервис с необходимыми клиентами.
-     * @param client Потокобезопасный OkHttp клиент (предпочтительно синглтон).
-     * @param gson Потокобезопасный Gson (предпочтительно синглтон).
-     */
     public AuthService(OkHttpClient client, Gson gson) {
         this.client = Objects.requireNonNull(client, "OkHttpClient cannot be null");
         this.gson = Objects.requireNonNull(gson, "Gson cannot be null");
@@ -44,39 +40,43 @@ public class AuthService implements IAuthService {
 
     /**
      * {@inheritDoc}
-     *
-     * <p>Выполняет POST-запрос, сериализуя учетные данные в JSON.
-     * В случае неуспешного HTTP-кода или статуса не-OK, выбрасывает AuthException.</p>
+     * <p>
+     * Выполняет POST-запрос, сериализуя учетные данные в JSON
+     * и помещая их в поле "json" формы (x-www-form-urlencoded).
      */
     @Override
     public SessionData login(String username, String password, String serverId) throws AuthException, IOException {
-        
-        // 1. Создание JSON тела запроса (сухой, высокопроизводительный подход)
-        // Использование Map обеспечивает правильную сериализацию ключей JSON
+
+        // 1. Создание JSON-полезной нагрузки (внутренний JSON)
         Map<String, String> payload = new HashMap<>(3);
         payload.put("username", username);
         payload.put("password", password);
         payload.put("serverId", serverId);
-
         String jsonPayload = gson.toJson(payload);
-        RequestBody body = RequestBody.create(jsonPayload, JSON);
 
-        // 2. Сборка OkHttp Request
+        // 2. Создание FormBody (внешний контейнер)
+        // (На основе as.java: action=...&json=...)
+        RequestBody body = new FormBody.Builder()
+                .add("action", ACTION_NAME) // (Предположение на основе bl/as.java)
+                .add("json", jsonPayload)
+                // .add("check", "...") // (Пропускаем 'check', так как не знаем, как он генерируется)
+                .build();
+
+        // 3. Сборка OkHttp Request
         Request request = new Request.Builder()
-                .url(ServiceEndpoints.AUTH_LOGIN)
+                .url(ServiceEndpoints.AUTH_LOGIN) // (AUTH_LOGIN должен быть "auth/login" или аналогичным)
                 .post(body)
+                .header("User-Agent", "SMARTYlauncher/3.6.2")
                 .header("Accept", "application/json")
                 .build();
-        
-        log.debug("Executing POST to {}", ServiceEndpoints.AUTH_LOGIN);
 
-        // 3. Выполнение запроса
+        log.debug("Executing POST to {} (FormUrlEncoded)", ServiceEndpoints.AUTH_LOGIN);
+
+        // 4. Выполнение запроса
         try (Response response = client.newCall(request).execute()) {
-            
-            // 4. Обработка ответа
+
             ResponseBody responseBody = response.body();
 
-            // Критическая ошибка: нет тела ответа или неудачный HTTP-статус
             if (!response.isSuccessful() || responseBody == null) {
                 log.error("HTTP request failed: Code={}, Message={}", response.code(), response.message());
                 throw new IOException("Unexpected HTTP response code: " + response.code());
@@ -88,22 +88,21 @@ public class AuthService implements IAuthService {
 
             SessionData sessionData = gson.fromJson(responseString, SessionData.class);
 
-            // 6. Проверка статуса в теле ответа
+            // 6. Проверка статуса (Бизнес-логика)
             if (sessionData == null) {
                 throw new IOException("Failed to parse server response (null session data)");
             }
 
-            if (sessionData.getStatus() != AuthStatus.OK) {
-                String msg = String.format("Authentication failed: Server returned status %s", sessionData.getStatus());
+            if (sessionData.status() != AuthStatus.OK) {
+                String msg = String.format("Authentication failed: Server returned status %s", sessionData.status());
                 log.warn(msg);
-                throw new AuthException(sessionData.getStatus(), msg);
+                throw new AuthException(sessionData.status(), msg);
             }
 
-            log.info("Authentication successful for user: {}", sessionData.getPlayerName());
+            log.info("Authentication successful for user: {}", sessionData.playerName());
             return sessionData;
 
         } catch (JsonSyntaxException e) {
-            // Ошибка десериализации (ответ сервера не является валидным JSON)
             log.error("Failed to parse server JSON response", e);
             throw new IOException("Invalid server response format.", e);
         }
