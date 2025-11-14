@@ -2,14 +2,11 @@ package hivens.ui;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import hivens.core.api.AuthService;
-import hivens.core.api.IAuthService;
-import hivens.core.api.IFileDownloadService;
-import hivens.core.api.IFileIntegrityService;
-import hivens.core.api.ILauncherService;
+import hivens.core.api.*;
 import hivens.launcher.FileDownloadService;
 import hivens.launcher.FileIntegrityService;
 import hivens.launcher.LauncherService;
+import hivens.launcher.ManifestProcessorService;
 import lombok.Getter;
 import okhttp3.OkHttpClient;
 
@@ -30,6 +27,7 @@ public class LauncherDI {
     private final IAuthService authService;
     private final IFileIntegrityService integrityService;
     private final IFileDownloadService downloadService;
+    private final IManifestProcessorService manifestProcessorService;
     private final ILauncherService launcherService;
 
     public LauncherDI() {
@@ -45,6 +43,7 @@ public class LauncherDI {
         this.authService = new AuthService(httpClient, gson);
         this.integrityService = new FileIntegrityService();
         this.downloadService = new FileDownloadService(httpClient);
-        this.launcherService = new LauncherService();
+        this.manifestProcessorService = new ManifestProcessorService();
+        this.launcherService = new LauncherService(manifestProcessorService);
     }
 }
