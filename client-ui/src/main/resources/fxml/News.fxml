@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.Cursor?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.VBox?>
+
+<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="430.0" prefWidth="445.0" stylesheets="@style.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="t">
+   <children>
+      <Pane layoutY="-30.0" prefHeight="90.0" styleClass="news__bg" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="50.0" />
+      <Pane prefHeight="90.0" styleClass="news__bg" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="145.0" />
+      <Pane prefHeight="90.0" styleClass="news__bg" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="240.0" />
+      <Pane prefHeight="41.0" styleClass="votes__bg" AnchorPane.bottomAnchor="35.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0">
+         <children>
+            <ImageView fx:id="banner1" fitHeight="31.0" fitWidth="88.0" layoutX="352.0" layoutY="5.0" pickOnBounds="true" preserveRatio="true">
+               <image>
+                  <Image url="@/images/banner6.png" />
+               </image>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </ImageView>
+            <ImageView fx:id="banner2" fitHeight="31.0" fitWidth="88.0" layoutX="259.0" layoutY="5.0" pickOnBounds="true" preserveRatio="true">
+               <image>
+                  <Image url="@/images/banner1.png" />
+               </image>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </ImageView>
+            <ImageView fx:id="banner3" fitHeight="31.0" fitWidth="88.0" layoutX="166.0" layoutY="5.0" pickOnBounds="true" preserveRatio="true">
+               <image>
+                  <Image url="@/images/banner5.png" />
+               </image>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </ImageView>
+            <Label fx:id="descVotes" layoutX="5.0" prefHeight="41.0" prefWidth="158.0" styleClass="votes__text" wrapText="true" />
+         </children>
+      </Pane>
+      <GridPane AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
+        <columnConstraints>
+          <ColumnConstraints halignment="CENTER" hgrow="SOMETIMES" maxWidth="-Infinity" minWidth="-Infinity" prefWidth="130.0" />
+          <ColumnConstraints halignment="LEFT" hgrow="SOMETIMES" />
+        </columnConstraints>
+        <rowConstraints>
+          <RowConstraints minHeight="-Infinity" prefHeight="95.0" vgrow="SOMETIMES" />
+          <RowConstraints minHeight="-Infinity" prefHeight="95.0" vgrow="SOMETIMES" />
+          <RowConstraints minHeight="-Infinity" prefHeight="95.0" vgrow="SOMETIMES" />
+        </rowConstraints>
+         <children>
+            <ImageView fx:id="image1" fitHeight="80.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true" />
+            <ImageView fx:id="image2" fitHeight="80.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true" GridPane.rowIndex="1" />
+            <ImageView fx:id="image3" fitHeight="80.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true" GridPane.rowIndex="2" />
+            <VBox GridPane.columnIndex="1">
+               <children>
+                  <Hyperlink fx:id="title1" pickOnBounds="false" styleClass="news__title" />
+                  <Label fx:id="desc1" styleClass="news__desc" />
+               </children>
+            </VBox>
+            <VBox GridPane.columnIndex="1" GridPane.rowIndex="1">
+               <children>
+                  <Hyperlink fx:id="title2" styleClass="news__title" />
+                  <Label fx:id="desc2" styleClass="news__desc" />
+               </children>
+            </VBox>
+            <VBox GridPane.columnIndex="1" GridPane.rowIndex="2">
+               <children>
+                  <Hyperlink fx:id="title3" styleClass="news__title" />
+                  <Label fx:id="desc3" styleClass="news__desc" />
+               </children>
+            </VBox>
+         </children>
+      </GridPane>
+   </children>
+</AnchorPane>

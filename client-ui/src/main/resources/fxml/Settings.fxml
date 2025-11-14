@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.scene.Cursor?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.effect.DropShadow?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.VBox?>
+
+<AnchorPane id="AnchorPane" fx:id="root" prefHeight="450.0" prefWidth="800.0" stylesheets="@style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ae">
+   <children>
+      <AnchorPane fx:id="background" styleClass="settings__backgroung" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="150.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <children>
+            <Button fx:id="back" mnemonicParsing="false" onMouseClicked="#clickBack" prefHeight="32.0" prefWidth="32.0" styleClass="settings__back" AnchorPane.leftAnchor="30.0" AnchorPane.topAnchor="30.0">
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </Button>
+            <Label fx:id="settingsTitle" prefHeight="32.0" styleClass="settings__back-title" AnchorPane.leftAnchor="70.0" AnchorPane.topAnchor="28.0" />
+            <GridPane AnchorPane.leftAnchor="30.0" AnchorPane.rightAnchor="30.0" AnchorPane.topAnchor="152.0">
+              <columnConstraints>
+                  <ColumnConstraints hgrow="SOMETIMES" maxWidth="-Infinity" minWidth="-Infinity" prefWidth="190.0" />
+                <ColumnConstraints halignment="LEFT" hgrow="SOMETIMES" maxWidth="-Infinity" minWidth="-Infinity" prefWidth="75.0" />
+                <ColumnConstraints hgrow="SOMETIMES" />
+              </columnConstraints>
+              <rowConstraints>
+                <RowConstraints prefHeight="40.0" vgrow="SOMETIMES" />
+                  <RowConstraints prefHeight="40.0" vgrow="SOMETIMES" />
+                  <RowConstraints prefHeight="40.0" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="10.0" prefHeight="40.0" vgrow="SOMETIMES" />
+                  <RowConstraints prefHeight="40.0" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="10.0" prefHeight="40.0" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="10.0" prefHeight="40.0" vgrow="SOMETIMES" />
+              </rowConstraints>
+               <children>
+                  <Label fx:id="fullScreenTitle" styleClass="settings__menu_title" />
+                  <CheckBox fx:id="fullScreenCheck" mnemonicParsing="false" onAction="#clickSettingsFullscreen" prefHeight="20.0" prefWidth="47.0" GridPane.columnIndex="1" />
+                  <Label fx:id="fullScreenDesc" styleClass="settings__menu_desc" wrapText="true" GridPane.columnIndex="2" />
+                  <Label fx:id="offlineTitle" styleClass="settings__menu_title" GridPane.rowIndex="1" />
+                  <CheckBox fx:id="offlineCheck" mnemonicParsing="false" onAction="#clickSettingsOffline" onMouseClicked="#clickSettingsOffline" prefHeight="20.0" prefWidth="47.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                  <Label fx:id="offlineDesc" styleClass="settings__menu_desc" wrapText="true" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                  <Label fx:id="autoConnectTitle" styleClass="settings__menu_title" GridPane.rowIndex="2" />
+                  <CheckBox fx:id="autoConnectCheck" mnemonicParsing="false" onAction="#clickSettingsAutoConnect" prefHeight="20.0" prefWidth="47.0" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                  <Label fx:id="autoConnectDesc" styleClass="settings__menu_desc" wrapText="true" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                  <Label fx:id="memoryTitle" styleClass="settings__menu_title" GridPane.rowIndex="4" />
+                  <CheckBox fx:id="memoryAutoCheck" mnemonicParsing="false" onAction="#clickSettingsMemoryAuto" prefHeight="20.0" prefWidth="47.0" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                  <Label fx:id="memoryAutoTitle" styleClass="settings__menu_desc" wrapText="true" GridPane.columnIndex="2" GridPane.rowIndex="4" />
+                  <Label fx:id="oneClickTitle" styleClass="settings__menu_title" GridPane.rowIndex="3" />
+                  <CheckBox fx:id="oneClickCheck" mnemonicParsing="false" onAction="#clickSettingsOneClick" prefHeight="20.0" prefWidth="47.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                  <Label fx:id="oneClickDesc" styleClass="settings__menu_desc" wrapText="true" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                  <Label fx:id="testModeDesc" layoutX="275.0" layoutY="141.0" styleClass="settings__menu_desc" wrapText="true" GridPane.columnIndex="2" GridPane.rowIndex="6" />
+                  <CheckBox fx:id="testModeCheck" layoutX="200.0" layoutY="180.0" mnemonicParsing="false" onAction="#clickSettingsTestMode" prefHeight="20.0" prefWidth="47.0" GridPane.columnIndex="1" GridPane.rowIndex="6" />
+                  <Label fx:id="testModeTitle" layoutX="10.0" layoutY="141.0" styleClass="settings__menu_title" GridPane.rowIndex="6" />
+               </children>
+            </GridPane>
+            <Slider fx:id="memorySlider" blockIncrement="1.0" majorTickUnit="1.0" max="2.0" minorTickCount="0" onDragDone="#slideMemory" onMouseReleased="#slideMemory" prefWidth="428.0" snapToTicks="true" value="1.0" AnchorPane.leftAnchor="213.0" AnchorPane.rightAnchor="30.0" AnchorPane.topAnchor="350.0" />
+            <VBox AnchorPane.leftAnchor="30.0" AnchorPane.rightAnchor="181.0" AnchorPane.topAnchor="77.0">
+               <children>
+                  <Label fx:id="folderTitle" styleClass="settings__menu_title" />
+                  <Hyperlink fx:id="folderPath" onMouseClicked="#clickFolderOpen" />
+                  <Label fx:id="folderDesc" styleClass="settings__menu_desc" />
+               </children>
+            </VBox>
+            <Button fx:id="folderReset" mnemonicParsing="false" onMouseClicked="#clickClientFolderReset" prefHeight="31.0" prefWidth="31.0" AnchorPane.rightAnchor="140.0" AnchorPane.topAnchor="92.0">
+               <styleClass>
+                  <String fx:value="btn" />
+                  <String fx:value="btn--gray" />
+                  <String fx:value="btn--undo" />
+               </styleClass>
+            </Button>
+            <Button fx:id="folderChoose" mnemonicParsing="false" onMouseClicked="#clickChoose" prefHeight="31.0" prefWidth="100.0" AnchorPane.rightAnchor="30.0" AnchorPane.topAnchor="92.0">
+               <styleClass>
+                  <String fx:value="btn" />
+                  <String fx:value="btn--blue" />
+               </styleClass>
+            </Button>
+         </children>
+      </AnchorPane>
+      <Pane layoutX="60.0" prefWidth="150.0" styleClass="settings__shadow" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.topAnchor="0.0" />
+      <FlowPane fx:id="modalMoving" alignment="CENTER" columnHalignment="CENTER" styleClass="settings__modal-cover" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <children>
+            <AnchorPane prefHeight="130.0" prefWidth="250.0" styleClass="settings__modal">
+               <children>
+                  <Label fx:id="modalMovingTitle" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="10.0" />
+                  <Label fx:id="modalMovingProgress" AnchorPane.bottomAnchor="30.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" />
+                  <ProgressBar fx:id="modalMovingProgressBar" progress="0.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" />
+               </children>
+               <effect>
+                  <DropShadow color="#00000040" height="0.0" radius="12.0" width="50.0" />
+               </effect>
+            </AnchorPane>
+         </children>
+      </FlowPane>
+      <FlowPane fx:id="modalMove" alignment="CENTER" columnHalignment="CENTER" styleClass="settings__modal-cover" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <children>
+            <AnchorPane prefHeight="130.0" prefWidth="250.0" styleClass="settings__modal">
+               <effect>
+                  <DropShadow color="#00000040" height="0.0" radius="12.0" width="50.0" />
+               </effect>
+               <children>
+                  <Label fx:id="modalMoveTitle" alignment="CENTER" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="10.0" />
+                  <Button fx:id="modalMoveCancel" mnemonicParsing="false" onMouseClicked="#modalMoveCancel" prefHeight="31.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="130.0">
+                     <styleClass>
+                        <String fx:value="btn" />
+                        <String fx:value="btn--gray" />
+                     </styleClass>
+                  </Button>
+                  <Button fx:id="modalMoveConfirm" mnemonicParsing="false" onMouseClicked="#modalMoveConfirm" prefHeight="31.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="130.0" AnchorPane.rightAnchor="10.0">
+                     <styleClass>
+                        <String fx:value="btn" />
+                        <String fx:value="btn--blue" />
+                     </styleClass>
+                  </Button>
+               </children>
+            </AnchorPane>
+         </children>
+      </FlowPane>
+      <FlowPane fx:id="modalMessage" alignment="CENTER" columnHalignment="CENTER" styleClass="settings__modal-cover" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <children>
+            <AnchorPane prefHeight="100.0" prefWidth="250.0" styleClass="settings__modal">
+               <effect>
+                  <DropShadow color="#00000040" height="0.0" radius="12.0" width="50.0" />
+               </effect>
+               <children>
+                  <Label fx:id="modalMessageTitle" alignment="CENTER" contentDisplay="CENTER" textAlignment="CENTER" wrapText="true" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="10.0" />
+                  <Button fx:id="modalMessageButton" mnemonicParsing="false" onMouseClicked="#modalMessageButton" prefHeight="31.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="70.0" AnchorPane.rightAnchor="70.0">
+                     <styleClass>
+                        <String fx:value="btn" />
+                        <String fx:value="btn--blue" />
+                     </styleClass>
+                  </Button>
+               </children>
+            </AnchorPane>
+         </children>
+      </FlowPane>
+   </children>
+</AnchorPane>
