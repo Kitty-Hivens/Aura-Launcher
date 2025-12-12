@@ -51,6 +51,7 @@ public class SettingsController {
         }
     }
 
+    @FXML
     private void onSaveClick() {
         try {
             int memory;
@@ -84,6 +85,7 @@ public class SettingsController {
         }
     }
 
+    @FXML
     private void onCancelClick() {
         try {
             mainApp.showLoginScene(); // (Возврат к главному экрану)

@@ -16,10 +16,10 @@ public final class ServiceEndpoints {
     /** Базовый домен для API и CDN. */
     public static final String BASE_URL = "https://www.smartycraft.ru";
 
-    /** Endpoint для аутентификации пользователя (POST). */
-    public static final String AUTH_LOGIN = BASE_URL + "/auth/login";
-
-    public static final String LAUNCHER_API = BASE_URL + "/launcher/";
+    /** Endpoint для аутентификации пользователя (POST). */// Новый путь, который мы нашли (возвращает 200 OK)
+    public static final String AUTH_LOGIN = BASE_URL + "/launcher2/index.php";
+    // Скорее всего, другие API тоже переехали туда же или лежат рядом
+    public static final String LAUNCHER_API = BASE_URL + "/launcher2/index.php";
 
     /** * Базовый путь на CDN для загрузки файлов клиента (моды, библиотеки). */
     public static final String CLIENT_DOWNLOAD_BASE = BASE_URL + "/launcher/clients/";

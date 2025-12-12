@@ -16,13 +16,13 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
-import javafx.util.StringConverter;
+import javafx.util.StringConverter; // ИМПОРТ ДЛЯ ИСПРАВЛЕНИЯ #15
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicBoolean; // ИМПОРТ ДЛЯ ИСПРАВЛЕНИЯ #3
 
 /**
  * Контроллер для LoginForm.fxml.
@@ -61,12 +61,13 @@ public class LoginController {
         servers.setConverter(new StringConverter<>() {
             @Override
             public String toString(ServerData server) {
+                // Отображаем "Имя (Версия)" или подсказку, если сервер null
                 return server == null ? "Выберите сервер..." : server.name() + " (" + server.version() + ")";
             }
 
             @Override
             public ServerData fromString(String string) {
-                return null;
+                return null; // Не нужно для нередактируемого ComboBox
             }
         });
 
@@ -132,7 +133,7 @@ public class LoginController {
         String pass = password.getText();
         ServerData selectedServer = servers.getSelectionModel().getSelectedItem();
 
-
+        // ИСПРАВЛЕНИЕ #6: Используем isBlank() для логина и isEmpty() для пароля
         if (username.isBlank() || pass.isEmpty() || selectedServer == null) {
             updateStatus("Заполните все поля и выберите сервер.", true);
             return;
