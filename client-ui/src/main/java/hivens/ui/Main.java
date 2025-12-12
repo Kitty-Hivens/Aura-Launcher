@@ -6,10 +6,12 @@ import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +41,10 @@ public class Main extends Application {
     @Override
     public void start(Stage primaryStage) throws IOException {
         this.primaryStage = primaryStage;
+        // Убираем стандартную рамку ОС (выглядит современно + WM часто делает такие окна плавающими)
+        primaryStage.initStyle(StageStyle.TRANSPARENT);
+        // Запрещаем менять размер (WM поймет, что это диалог/лаунчер)
+        primaryStage.setResizable(false);
         showLoginScene(); // Запускаем Login
     }
 

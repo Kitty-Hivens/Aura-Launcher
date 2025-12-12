@@ -58,7 +58,7 @@ public class LauncherDI {
         // 3. Инициализация сервисов
         this.authService = new AuthService(httpClient, gson);
         this.integrityService = new FileIntegrityService();
-        this.downloadService = new FileDownloadService(httpClient);
+        this.downloadService = new FileDownloadService(httpClient, gson);
         this.manifestProcessorService = new ManifestProcessorService();
         this.launcherService = new LauncherService(manifestProcessorService);
         this.serverListService = new ServerListService();
