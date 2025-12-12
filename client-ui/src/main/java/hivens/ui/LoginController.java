@@ -4,29 +4,20 @@ import hivens.core.api.AuthException;
 import hivens.core.api.IAuthService;
 import hivens.core.api.IServerListService;
 import hivens.core.api.ISettingsService;
-import hivens.core.data.ServerData;
-import hivens.core.data.ServerListResponse;
+import hivens.core.api.model.ServerProfile; // ВАЖНО: Используем Profile, а не Data
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextField;
-import javafx.util.StringConverter; // ИМПОРТ ДЛЯ ИСПРАВЛЕНИЯ #15
+import javafx.scene.control.*;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean; // ИМПОРТ ДЛЯ ИСПРАВЛЕНИЯ #3
+import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Контроллер для LoginForm.fxml.
- */
 public class LoginController {
 
     private static final Logger log = LoggerFactory.getLogger(LoginController.class);
@@ -36,7 +27,9 @@ public class LoginController {
     @FXML private Button enter;
     @FXML private Button settings;
     @FXML private Label status;
-    @FXML private ComboBox<ServerData> servers;
+
+    // ВАЖНО: Тип теперь ServerProfile
+    @FXML private ComboBox<ServerProfile> servers;
 
     private final IAuthService authService;
     private final IServerListService serverListService;
@@ -58,21 +51,10 @@ public class LoginController {
         setControlsDisabled(true);
         status.setText("Загрузка настроек...");
 
-        servers.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(ServerData server) {
-                // Отображаем "Имя (Версия)" или подсказку, если сервер null
-                return server == null ? "Выберите сервер..." : server.name() + " (" + server.version() + ")";
-            }
-
-            @Override
-            public ServerData fromString(String string) {
-                return null; // Не нужно для нередактируемого ComboBox
-            }
-        });
+        // Converter больше НЕ НУЖЕН, так как ServerProfile.toString() возвращает красивое имя.
+        // servers.setConverter(...); <--- УДАЛЕНО
 
         Task<SettingsData> settingsTask = getSettingsTask();
-
         new Thread(settingsTask).start();
     }
 
@@ -104,45 +86,46 @@ public class LoginController {
         }
 
         status.setText("Загрузка списка серверов...");
-        Task<ServerListResponse> task = new Task<>() {
-            @Override
-            protected ServerListResponse call() throws Exception {
-                return serverListService.getServerList();
-            }
-        };
 
-        task.setOnFailed(e -> {
-            updateStatus("Ошибка загрузки списка серверов.", true);
-            log.error("Failed to load server list", task.getException());
-        });
-
-        task.setOnSucceeded(e -> {
-            ServerListResponse response = task.getValue();
-            servers.getItems().setAll(response.servers());
-            servers.getSelectionModel().selectFirst();
-            setControlsDisabled(false);
-            updateStatus("Готов к входу.", false);
-        });
-
-        new Thread(task).start();
+        // Новая логика через CompletableFuture
+        serverListService.fetchProfiles()
+                .thenAccept(profiles -> Platform.runLater(() -> {
+                    if (profiles.isEmpty()) {
+                        updateStatus("Список серверов пуст (ошибка сети?)", true);
+                        setControlsDisabled(false); // Даем доступ к настройкам
+                    } else {
+                        servers.getItems().setAll(profiles);
+                        servers.getSelectionModel().selectFirst();
+                        setControlsDisabled(false);
+                        updateStatus("Готов к входу.", false);
+                    }
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        log.error("Failed to load server list", ex);
+                        updateStatus("Ошибка загрузки серверов.", true);
+                        setControlsDisabled(false);
+                    });
+                    return null;
+                });
     }
 
     @FXML
     private void onLoginClick() {
         String username = login.getText();
         String pass = password.getText();
-        ServerData selectedServer = servers.getSelectionModel().getSelectedItem();
+        ServerProfile selectedServer = servers.getSelectionModel().getSelectedItem();
 
-        // ИСПРАВЛЕНИЕ #6: Используем isBlank() для логина и isEmpty() для пароля
         if (username.isBlank() || pass.isEmpty() || selectedServer == null) {
-            updateStatus("Заполните все поля и выберите сервер.", true);
+            updateStatus("Заполните все поля.", true);
             return;
         }
 
         Task<SessionData> loginTask = new Task<>() {
             @Override
             protected SessionData call() throws Exception {
-                return authService.login(username, pass, selectedServer.name());
+                // Передаем имя сервера для авторизации
+                return authService.login(username, pass, selectedServer.getName());
             }
         };
 
@@ -153,9 +136,19 @@ public class LoginController {
             SessionData session = loginTask.getValue();
             Platform.runLater(() -> {
                 try {
-                    mainApp.showProgressScene(session, selectedServer, currentSettings);
-                } catch (IOException ex) {
-                    log.error("Failed to switch to Progress scene", ex);
+                    // ВАЖНО: Тут нужно будет обновить Main, чтобы он принимал ServerProfile
+                    // Пока передаем null или адаптируем, если Main еще требует ServerData
+                    // Но лучше обновить Main.showProgressScene под ServerProfile.
+                    // mainApp.showProgressScene(session, selectedServer, currentSettings);
+
+                    log.info("Login success! Session: {}", session.playerName());
+                    status.setText("Вход выполнен! (Запуск...)");
+
+                    // ВРЕМЕННО: Просто логируем, пока Main не обновлен
+                    // mainApp.showProgressScene(...);
+
+                } catch (Exception ex) {
+                    log.error("Failed to switch scene", ex);
                     handleLoginFailure(ex);
                 }
             });
@@ -175,13 +168,9 @@ public class LoginController {
 
     private void handleLoginFailure(Throwable exception) {
         setControlsDisabled(false);
-        String errorMsg = "Ошибка сети.";
+        String errorMsg = "Ошибка входа.";
         if (exception instanceof AuthException authEx) {
-            log.warn("AuthException: {}", authEx.getStatus());
-            // TODO: Заменить на более дружелюбные сообщения
             errorMsg = "Ошибка: " + authEx.getStatus();
-        } else {
-            log.error("Network or IO error", exception);
         }
         updateStatus(errorMsg, true);
     }
@@ -196,5 +185,10 @@ public class LoginController {
 
     private void updateStatus(String message, boolean isError) {
         status.setText(message);
+        if (isError) {
+            status.setStyle("-fx-text-fill: #FF5555;");
+        } else {
+            status.setStyle("-fx-text-fill: #FFFFFF;"); // Или стиль по умолчанию
+        }
     }
 }

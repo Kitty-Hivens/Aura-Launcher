@@ -61,7 +61,7 @@ public class LauncherDI {
         this.downloadService = new FileDownloadService(httpClient);
         this.manifestProcessorService = new ManifestProcessorService();
         this.launcherService = new LauncherService(manifestProcessorService);
-        this.serverListService = new ServerListService(httpClient, gson);
+        this.serverListService = new ServerListService();
         this.settingsService = new SettingsService(gson, settingsFilePath);
     }
 }

@@ -4,6 +4,7 @@ import hivens.core.api.IFileDownloadService;
 import hivens.core.api.IFileIntegrityService;
 import hivens.core.api.ILauncherService;
 import hivens.core.api.IManifestProcessorService;
+import hivens.core.api.model.ServerProfile;
 import hivens.core.data.FileData;
 import hivens.core.data.FileManifest;
 import hivens.core.data.ServerData;
@@ -30,7 +31,7 @@ public class UpdateAndLaunchTask extends Task<Process> {
     private final IFileDownloadService downloadService;
     private final ILauncherService launcherService;
     private final SessionData sessionData;
-    private final ServerData serverData;
+    private final ServerProfile serverProfile;
     private final Path clientRootPath;
     private final Path javaPath;
     private final int memoryMB;
@@ -38,7 +39,7 @@ public class UpdateAndLaunchTask extends Task<Process> {
     public UpdateAndLaunchTask(
             LauncherDI di,
             SessionData sessionData,
-            ServerData serverData,
+            ServerProfile serverProfile,
             Path clientRoot,
             Path javaPath,
             int memory
@@ -51,7 +52,7 @@ public class UpdateAndLaunchTask extends Task<Process> {
 
         // ... (Получаем данные) ...
         this.sessionData = sessionData;
-        this.serverData = serverData;
+        this.serverProfile = serverProfile;
         this.clientRootPath = clientRoot;
         this.javaPath = javaPath;
         this.memoryMB = memory;
@@ -108,7 +109,7 @@ public class UpdateAndLaunchTask extends Task<Process> {
 
         Process process = launcherService.launchClient(
                 sessionData,
-                serverData,
+                serverProfile,
                 clientRootPath,
                 javaPath,
                 memoryMB

@@ -1,5 +1,6 @@
 package hivens.core.api;
 
+import hivens.core.api.model.ServerProfile;
 import hivens.core.data.ServerData;
 import hivens.core.data.SessionData;
 
@@ -15,7 +16,7 @@ public interface ILauncherService {
      * Собирает и выполняет команду запуска клиента Minecraft.
      *
      * @param sessionData Данные сессии (accessToken, uuid, playerName).
-     * @param serverData Данные о выбранном сервере (версия, имя).
+     * @param serverProfile Данные о выбранном сервере (версия, имя).
      * @param clientRootPath Абсолютный путь к корню клиента.
      * @param javaExecutablePath Абсолютный путь к исполняемому файлу java.
      * @param allocatedMemoryMB Объем выделяемой памяти в МБ (e.g., 4096).
@@ -24,7 +25,7 @@ public interface ILauncherService {
      */
     Process launchClient(
             SessionData sessionData,
-            ServerData serverData,
+            ServerProfile serverProfile,
             Path clientRootPath,
             Path javaExecutablePath,
             int allocatedMemoryMB

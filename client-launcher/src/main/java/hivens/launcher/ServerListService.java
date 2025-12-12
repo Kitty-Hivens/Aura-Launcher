@@ -1,5 +1,6 @@
 package hivens.launcher;
 
+import hivens.core.api.IServerListService;
 import hivens.core.api.SmartyNetworkService;
 import hivens.core.api.dto.SmartyServer;
 import hivens.core.api.model.ServerProfile;
@@ -9,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public class ServerListService {
+public class ServerListService implements IServerListService {
 
     private final SmartyNetworkService networkService;
 

@@ -1,5 +1,6 @@
 package hivens.ui;
 
+import hivens.core.api.model.ServerProfile;
 import hivens.core.data.ServerData;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
@@ -61,14 +62,14 @@ public class Main extends Application {
     /**
      * Запускает Оркестратор и переключается на сцену Прогресса.
      */
-    public void showProgressScene(SessionData session, ServerData server, SettingsData settings) throws IOException {
+    public void showProgressScene(SessionData session, ServerProfile server, SettingsData settings) throws IOException {
         FXMLLoader loader = loadFXML("Progress.fxml");
 
         UpdateAndLaunchTask task = new UpdateAndLaunchTask(
                 container,
                 session,
                 server,
-                container.getDataDirectory(), // (e.g., /home/haru/.SCOL)
+                container.getDataDirectory(),
                 Paths.get(settings.javaPath()),
                 settings.memoryMB()
         );
