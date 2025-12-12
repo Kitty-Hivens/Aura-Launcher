@@ -49,20 +49,16 @@ public class ServerListService implements IServerListService {
         });
     }
 
-    @NotNull
     private static ServerProfile getProfile(SmartyServer srv) {
         ServerProfile profile = new ServerProfile();
-
-        // Формируем имя, например: "Create 1.21.1"
-        profile.setName(srv.name + " " + srv.version);
+        profile.setName(srv.name);
+        profile.setTitle(srv.name + " " + srv.version);
 
         profile.setVersion(srv.version);
         profile.setIp(srv.address);
         profile.setPort(srv.port);
-
-        // Важно: AssetDir определяет, в какую папку качать файлы.
-        // У Smarty это обычно просто имя сервера ("Create", "Industrial")
         profile.setAssetDir(srv.name);
+
         return profile;
     }
 }

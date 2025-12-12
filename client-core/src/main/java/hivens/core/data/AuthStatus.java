@@ -1,12 +1,20 @@
 package hivens.core.data;
 
-/**
- * Статусы аутентификации, возвращаемые API SmartyCraft.
- */
+import com.google.gson.annotations.SerializedName;
+
 public enum AuthStatus {
-    OK,              // Успешная авторизация
-    BAD_LOGIN,       // Неверный логин
-    BAD_PASSWORD,    // Неверный пароль
-    NO_SERVER,       // Сервер не найден
-    INTERNAL_ERROR   // Внутренняя ошибка сервера
+    @SerializedName("OK")
+    OK,
+
+    @SerializedName("LOGIN") // Сервер возвращает это, если логин не найден
+    BAD_LOGIN,
+
+    @SerializedName("PASSWORD") // Сервер возвращает это, если пароль неверный
+    BAD_PASSWORD,
+
+    @SerializedName("SERVER") // Сервер возвращает это, если ID сервера неверный
+    SERVER,
+
+    NO_SERVER,
+    INTERNAL_ERROR
 }
