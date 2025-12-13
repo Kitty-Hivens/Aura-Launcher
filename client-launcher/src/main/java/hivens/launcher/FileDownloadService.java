@@ -40,13 +40,10 @@ public class FileDownloadService implements IFileDownloadService {
     // Лаунчер будет ИГНОРИРОВАТЬ эти файлы при скачивании.
     private static final List<String> OPTIONAL_MODS_BLACKLIST = List.of(
             "ReplayMod",
-            "OptiFine",
             "FoamFix",
             "BetterFps",
             "TexFix",
-            "DiscordRP",
-            "ConnectedTexturesMod",
-            "Chisel"
+            "DiscordRP"
     );
 
     public FileDownloadService(OkHttpClient client, Gson gson) {
@@ -132,7 +129,7 @@ public class FileDownloadService implements IFileDownloadService {
 
             // --- ФИЛЬТР: Пропускаем опасные моды ---
             boolean isBanned = OPTIONAL_MODS_BLACKLIST.stream()
-                    .anyMatch(banned -> relPath.contains(banned));
+                    .anyMatch(relPath::contains);
 
             if (isBanned) {
                 logger.info("🚫 SKIPPING unstable/optional mod: {}", relPath);

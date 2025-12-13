@@ -12,7 +12,6 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -80,37 +79,65 @@ public class LauncherService implements ILauncherService {
             actualJavaPath = javaExecutablePath.toString();
         }
 
-        List<String> command = new ArrayList<>();
-        command.add(actualJavaPath);
+        List<String> jvmArgs = new ArrayList<>();
+        jvmArgs.add(actualJavaPath);
 
-        // --- ЭТАП 3: Аргументы JVM ---
-        command.addAll(config.jvmArgs());
-        command.add("-Xms512M");
-        command.add("-Xmx" + allocatedMemoryMB + "M");
-        command.add("-noverify");
+        // --- ЭТАП 3: Оптимизированные аргументы JVM для 1.12.2 ---
+        if ("1.12.2".equals(version)) {
+            // Специальные аргументы G1GC для модпаков
+            jvmArgs.add("-XX:+UseG1GC");
+            jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
+            jvmArgs.add("-XX:G1NewSizePercent=20");
+            jvmArgs.add("-XX:G1ReservePercent=20");
+            jvmArgs.add("-XX:MaxGCPauseMillis=50");
+            jvmArgs.add("-XX:G1HeapRegionSize=32M");
+
+            // Forge-специфичные флаги
+            jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
+            jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
+
+
+        } else if("1.7.10".equals(version)) {
+            jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
+            jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
+            jvmArgs.add("-XX:+UseG1GC");
+            jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
+            jvmArgs.add("-XX:G1NewSizePercent=20");
+            jvmArgs.add("-XX:G1ReservePercent=20");
+            jvmArgs.add("-XX:MaxGCPauseMillis=50");
+            jvmArgs.add("-XX:G1HeapRegionSize=32M");
+        } else {
+            // Для других версий используем базовые аргументы из конфига
+            jvmArgs.addAll(config.jvmArgs());
+        }
+
+        // Память
+        jvmArgs.add("-Xms512M");
+        jvmArgs.add("-Xmx" + allocatedMemoryMB + "M");
+
         // Путь к нативам
         Path nativesPath = clientRootPath.resolve(config.nativesDir());
-        command.add("-Djava.library.path=" + nativesPath.toAbsolutePath());
+        jvmArgs.add("-Djava.library.path=" + nativesPath.toAbsolutePath());
 
         // Classpath (Сборка с учетом фильтрации и сортировки)
-        command.add("-cp");
-        command.add(buildClasspath(clientRootPath, sessionData.fileManifest()));
+        jvmArgs.add("-cp");
+        jvmArgs.add(buildClasspath(clientRootPath, sessionData.fileManifest()));
 
         // Main Class
-        command.add(config.mainClass());
+        jvmArgs.add(config.mainClass());
 
         // --- ЭТАП 4: Аргументы Minecraft ---
-        command.addAll(buildMinecraftArgs(sessionData, serverProfile, clientRootPath, config.assetIndex()));
+        jvmArgs.addAll(buildMinecraftArgs(sessionData, serverProfile, clientRootPath, config.assetIndex()));
 
         // TweakClass
         if (config.tweakClass() != null) {
-            command.add("--tweakClass");
-            command.add(config.tweakClass());
+            jvmArgs.add("--tweakClass");
+            jvmArgs.add(config.tweakClass());
         }
 
-        log.debug("Assembled launch command: {}", String.join(" ", command));
+        log.debug("Assembled launch command: {}", String.join(" ", jvmArgs));
 
-        ProcessBuilder pb = new ProcessBuilder(command);
+        ProcessBuilder pb = new ProcessBuilder(jvmArgs);
         pb.directory(clientRootPath.toFile());
         pb.redirectErrorStream(true); // Объединяем потоки вывода
 
@@ -128,7 +155,7 @@ public class LauncherService implements ILauncherService {
             } catch (IOException e) {
                 // Игнорируем ошибку при закрытии игры
             }
-        }).start();
+        }, "GameOutputReader").start();
 
         return process;
     }
@@ -140,10 +167,7 @@ public class LauncherService implements ILauncherService {
             walk.filter(p -> {
                         String name = p.toString();
                         // Фильтруем всё, что вызывает краш
-                        return name.contains("ReplayMod") ||
-                                name.contains("OptiFine") ||
-                                name.contains("ConnectedTexturesMod") ||
-                                name.contains("Chisel");
+                        return name.contains("ReplayMod");
                     })
                     .map(Path::toFile)
                     .forEach(file -> {
@@ -165,7 +189,7 @@ public class LauncherService implements ILauncherService {
         if (Files.exists(nativesZip)) {
             File dir = nativesDir.toFile();
             // Если папки нет или она пустая - распаковываем
-            if (!dir.exists() || (dir.listFiles() != null && dir.listFiles().length == 0)) {
+            if (!dir.exists() || (dir.listFiles() != null && Objects.requireNonNull(dir.listFiles()).length == 0)) {
                 log.info("Extracting natives from {} to {}...", nativesZip, nativesDir);
                 try {
                     unzip(nativesZip.toFile(), nativesDir.toFile());
@@ -237,26 +261,16 @@ public class LauncherService implements ILauncherService {
 
     private String buildClasspath(Path clientRootPath, FileManifest manifest) {
         return manifestProcessor.flattenManifest(manifest).keySet().stream()
+                // 1. Оставляем только JAR-файлы и библиотеки, исключая моды:
                 .filter(f -> f.endsWith(".jar"))
-                // На всякий случай фильтруем и здесь, чтобы не попало в Classpath
-                .filter(f -> !f.contains("ReplayMod") && !f.contains("OptiFine"))
+                .filter(f -> !f.contains("/mods/")) // Исключаем все, что лежит в папке mods/
 
-                // --- СОРТИРОВКА (Фикс для vecmath и прочих библиотек) ---
+                // 2. Сортировка (оставляем только для vecmath и библиотек)
                 .sorted((path1, path2) -> {
-                    // 1. vecmath ВСЕГДА первым (критично для 1.12.2)
                     if (path1.contains("vecmath")) return -1;
                     if (path2.contains("vecmath")) return 1;
-
-                    // 2. Библиотеки раньше модов
-                    boolean isLib1 = path1.contains("libraries");
-                    boolean isLib2 = path2.contains("libraries");
-                    if (isLib1 && !isLib2) return -1;
-                    if (!isLib1 && isLib2) return 1;
-
-                    // 3. По алфавиту
                     return path1.compareTo(path2);
                 })
-                // -------------------------------------------------------
 
                 .map(clientRootPath::resolve)
                 .map(Path::toString)
