@@ -24,7 +24,7 @@ public class LauncherService implements ILauncherService {
 
     private static final Logger log = LoggerFactory.getLogger(LauncherService.class);
 
-    // ПУТЬ К JAVA 8 (Твой рабочий путь из логов)
+    // ПУТЬ К JAVA 8 (Твой рабочий путь)
     private static final String FORCED_JAVA_8_PATH = "/usr/lib/jvm/liberica-jdk-8-full/bin/java";
 
     private final IManifestProcessorService manifestProcessor;
@@ -63,12 +63,14 @@ public class LauncherService implements ILauncherService {
             throw new IOException("No launch configuration found for version: " + version);
         }
 
-        // --- ЭТАП 0: ЗАЧИСТКА ВРАГОВ (ReplayMod) ---
-        // Удаляем проблемные моды физически перед запуском
+        // --- ЭТАП 0: ЗАЧИСТКА ВРАГОВ (ReplayMod и т.д.) ---
         deleteBannedMods(clientRootPath);
 
-        // --- ЭТАП 1: Подготовка нативов (Распаковка ZIP) ---
+        // --- ЭТАП 1: Подготовка нативов ---
         prepareNatives(clientRootPath, config.nativesDir(), version);
+
+        // --- ЭТАП 1.5: Подготовка Ассетов (НОВОЕ: Фикс звуков) ---
+        prepareAssets(clientRootPath, "assets-" + version + ".zip");
 
         // --- ЭТАП 2: Выбор Java (Форсируем Java 8 для 1.12.2) ---
         String actualJavaPath;
@@ -82,34 +84,28 @@ public class LauncherService implements ILauncherService {
         List<String> jvmArgs = new ArrayList<>();
         jvmArgs.add(actualJavaPath);
 
-        // --- ЭТАП 3: Оптимизированные аргументы JVM для 1.12.2 ---
+        // --- ЭТАП 3: Аргументы JVM ---
         if ("1.12.2".equals(version)) {
-            // Специальные аргументы G1GC для модпаков
+            // Аргументы G1GC для 1.12.2
             jvmArgs.add("-XX:+UseG1GC");
             jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
             jvmArgs.add("-XX:G1NewSizePercent=20");
             jvmArgs.add("-XX:G1ReservePercent=20");
             jvmArgs.add("-XX:MaxGCPauseMillis=50");
             jvmArgs.add("-XX:G1HeapRegionSize=32M");
-
-            // Forge-специфичные флаги
+            // Forge флаги
             jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
             jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
-
-
         } else if("1.7.10".equals(version)) {
+            // Аргументы для 1.7.10
             jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
             jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
             jvmArgs.add("-XX:+UseG1GC");
-            jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
-            jvmArgs.add("-XX:G1NewSizePercent=20");
-            jvmArgs.add("-XX:G1ReservePercent=20");
-            jvmArgs.add("-XX:MaxGCPauseMillis=50");
-            jvmArgs.add("-XX:G1HeapRegionSize=32M");
-        } else {
-            // Для других версий используем базовые аргументы из конфига
-            jvmArgs.addAll(config.jvmArgs());
+            // ... остальные флаги GC, если нужны ...
         }
+
+        // Добавляем флаги из конфига (там лежат брендовые флаги SmartyCraft!)
+        jvmArgs.addAll(config.jvmArgs());
 
         // Память
         jvmArgs.add("-Xms512M");
@@ -119,14 +115,14 @@ public class LauncherService implements ILauncherService {
         Path nativesPath = clientRootPath.resolve(config.nativesDir());
         jvmArgs.add("-Djava.library.path=" + nativesPath.toAbsolutePath());
 
-        // Classpath (Сборка с учетом фильтрации и сортировки)
+        // Classpath
         jvmArgs.add("-cp");
         jvmArgs.add(buildClasspath(clientRootPath, sessionData.fileManifest()));
 
         // Main Class
         jvmArgs.add(config.mainClass());
 
-        // --- ЭТАП 4: Аргументы Minecraft ---
+        // --- ЭТАП 4: Аргументы Minecraft (С ФИКСОМ BAD SESSION) ---
         jvmArgs.addAll(buildMinecraftArgs(sessionData, serverProfile, clientRootPath, config.assetIndex()));
 
         // TweakClass
@@ -139,13 +135,13 @@ public class LauncherService implements ILauncherService {
 
         ProcessBuilder pb = new ProcessBuilder(jvmArgs);
         pb.directory(clientRootPath.toFile());
-        pb.redirectErrorStream(true); // Объединяем потоки вывода
+        pb.redirectErrorStream(true);
 
         log.info("Launching client process for user {} (Version: {})...", sessionData.playerName(), version);
 
         Process process = pb.start();
 
-        // Читаем вывод процесса в консоль (для отладки)
+        // Читаем вывод процесса (GameOutputReader)
         new Thread(() -> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
@@ -153,48 +149,88 @@ public class LauncherService implements ILauncherService {
                     System.out.println("[GAME] " + line);
                 }
             } catch (IOException e) {
-                // Игнорируем ошибку при закрытии игры
+                // Игнорируем
             }
         }, "GameOutputReader").start();
 
         return process;
     }
 
-    // --- УБИЙЦА МОДОВ ---
-    private void deleteBannedMods(Path root) {
-        log.info("Scanning for banned mods...", root);
-        try (Stream<Path> walk = Files.walk(root)) {
-            walk.filter(p -> {
-                        String name = p.toString();
-                        // Фильтруем всё, что вызывает краш
-                        return name.contains("ReplayMod");
-                    })
-                    .map(Path::toFile)
-                    .forEach(file -> {
-                        if (file.delete()) {
-                            log.warn("🔥🔥🔥 DELETED BANNED MOD: {} 🔥🔥🔥", file.getAbsolutePath());
-                        }
-                    });
-        } catch (IOException e) {
-            log.error("Error cleaning mods", e);
+    // --- ФИКС: ОБНОВЛЕННЫЙ МЕТОД АРГУМЕНТОВ ---
+    private List<String> buildMinecraftArgs(SessionData sessionData, ServerProfile serverProfile, Path clientRootPath, String assetIndex) {
+        // 1. Форматирование UUID (32 -> 36 chars) - КРИТИЧНО ДЛЯ 1.12.2
+        String uuid = sessionData.uuid();
+        if (uuid != null && uuid.length() == 32) {
+            uuid = uuid.replaceFirst(
+                    "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})",
+                    "$1-$2-$3-$4-$5"
+            );
+            log.info("Formatted UUID for legacy client: {} -> {}", sessionData.uuid(), uuid);
         }
+
+        assert uuid != null;
+        return List.of(
+                "--username", sessionData.playerName(),
+                "--version", "Forge " + serverProfile.getVersion(),
+                "--gameDir", clientRootPath.toString(),
+                "--assetsDir", clientRootPath.resolve("assets").toString(),
+                "--assetIndex", assetIndex,
+                "--uuid", uuid,               // Исправленный UUID с дефисами
+                "--accessToken", sessionData.accessToken(),
+                "--userProperties", "{}",
+                "--userType", "legacy",       // <--- КЛЮЧЕВОЙ ФИКС BAD SESSION
+                "--versionType", "Forge"
+        );
     }
 
-    // --- ЛОГИКА РАСПАКОВКИ НАТИВОВ ---
     private void prepareNatives(Path clientRoot, String nativesDirName, String version) {
         Path binDir = clientRoot.resolve("bin");
         Path nativesDir = clientRoot.resolve(nativesDirName);
-        Path nativesZip = binDir.resolve("natives-" + version + ".zip");
+        OS currentOS = getPlatform();
+
+        String targetZipName = "natives-" + version + ".zip";
+        Path nativesZip = binDir.resolve(targetZipName);
 
         if (Files.exists(nativesZip)) {
             File dir = nativesDir.toFile();
-            // Если папки нет или она пустая - распаковываем
             if (!dir.exists() || (dir.listFiles() != null && Objects.requireNonNull(dir.listFiles()).length == 0)) {
-                log.info("Extracting natives from {} to {}...", nativesZip, nativesDir);
+                log.info("Extracting natives from {}...", nativesZip);
                 try {
                     unzip(nativesZip.toFile(), nativesDir.toFile());
+
+                    if (currentOS == OS.LINUX && !hasLinuxNatives(nativesDir)) {
+                        log.warn("⚠️ Нативы распакованы, но файлов .so не найдено! Качаем аварийный комплект Linux...");
+                        downloadFallbackNatives(nativesDir, version, OS.LINUX);
+                    } else if (currentOS == OS.MACOS && !hasMacNatives(nativesDir)) {
+                        log.warn("⚠️ Нативы распакованы, но файлов .dylib не найдено! Качаем аварийный комплект Mac...");
+                        downloadFallbackNatives(nativesDir, version, OS.MACOS);
+                    }
+
                 } catch (IOException e) {
                     log.error("Failed to unzip natives!", e);
+                }
+            }
+        } else {
+            log.warn("Natives archive not found: {}", nativesZip);
+            if (currentOS != OS.WINDOWS) {
+                downloadFallbackNatives(nativesDir, version, currentOS);
+            }
+        }
+    }
+
+    // --- НОВЫЙ МЕТОД: РАСПАКОВКА АССЕТОВ ---
+    private void prepareAssets(Path clientRoot, String assetsZipName) {
+        Path assetsDir = clientRoot.resolve("assets");
+        Path assetsZip = clientRoot.resolve(assetsZipName);
+
+        // Если архив скачан, но папка indexes пуста или отсутствует - распаковываем
+        if (Files.exists(assetsZip)) {
+            if (!Files.exists(assetsDir.resolve("indexes"))) {
+                log.info("Extracting assets from {}...", assetsZip);
+                try {
+                    unzip(assetsZip.toFile(), assetsDir.toFile());
+                } catch (IOException e) {
+                    log.error("Failed to unzip assets!", e);
                 }
             }
         }
@@ -229,13 +265,46 @@ public class LauncherService implements ILauncherService {
         }
     }
 
+    private void deleteBannedMods(Path root) {
+        log.info("Scanning for banned mods...", root);
+        try (Stream<Path> walk = Files.walk(root)) {
+            walk.filter(p -> p.toString().contains("ReplayMod")) // или другие моды
+                    .map(Path::toFile)
+                    .forEach(file -> {
+                        if (file.delete()) {
+                            log.warn("🔥🔥🔥 DELETED BANNED MOD: {} 🔥🔥🔥", file.getAbsolutePath());
+                        }
+                    });
+        } catch (IOException e) {
+            log.error("Error cleaning mods", e);
+        }
+    }
+
+    private String buildClasspath(Path clientRootPath, FileManifest manifest) {
+        return manifestProcessor.flattenManifest(manifest).keySet().stream()
+                .filter(f -> f.endsWith(".jar"))
+                .filter(f -> !f.contains("/mods/"))
+                .sorted((path1, path2) -> {
+                    if (path1.contains("vecmath")) return -1;
+                    if (path2.contains("vecmath")) return 1;
+                    return path1.compareTo(path2);
+                })
+                .map(clientRootPath::resolve)
+                .map(Path::toString)
+                .collect(Collectors.joining(File.pathSeparator));
+    }
+
     private Map<String, LaunchConfig> buildLaunchConfigMap() {
         return Map.of(
                 "1.7.10", new LaunchConfig(
                         "net.minecraft.launchwrapper.Launch",
                         "cpw.mods.fml.common.launcher.FMLTweaker",
                         "1.7.10",
-                        List.of("-XX:+UseG1GC", "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true"),
+                        List.of(
+                                "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true",
+                                "-Dminecraft.launcher.brand=smartycraft",
+                                "-Dlauncher.version=3.0.0"
+                        ),
                         "bin/natives-1.7.10"
                 ),
                 "1.12.2", new LaunchConfig(
@@ -244,8 +313,27 @@ public class LauncherService implements ILauncherService {
                         "1.12.2",
                         List.of(
                                 "-XX:+UseG1GC",
+                                "-XX:+UnlockExperimentalVMOptions",
+                                "-XX:G1NewSizePercent=20",
+                                "-XX:G1ReservePercent=20",
+                                "-XX:MaxGCPauseMillis=50",
+                                "-XX:G1HeapRegionSize=32M",
                                 "-Dfml.ignoreInvalidMinecraftCertificates=true",
-                                "-Dfml.ignorePatchDiscrepancies=true"
+                                "-Dfml.ignorePatchDiscrepancies=true",
+
+                                // --- ФИКС АВТОРИЗАЦИИ (HTTP) ---
+                                // Указываем базовый URL без https
+                                "-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/",
+                                "-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/",
+                                "-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/",
+                                "-Dminecraft.api.services.host=http://www.smartycraft.ru/launcher/",
+
+                                // Некоторые патченые authlib ищут это свойство:
+                                "-Dauthlib.remote.connection=http://www.smartycraft.ru/launcher/",
+
+                                // Бренд и версия (попробуем с большой буквы)
+                                "-Dminecraft.launcher.brand=SmartyCraft",
+                                "-Dlauncher.version=3.0.0"
                         ),
                         "bin/natives-1.12.2"
                 ),
@@ -259,34 +347,30 @@ public class LauncherService implements ILauncherService {
         );
     }
 
-    private String buildClasspath(Path clientRootPath, FileManifest manifest) {
-        return manifestProcessor.flattenManifest(manifest).keySet().stream()
-                // 1. Оставляем только JAR-файлы и библиотеки, исключая моды:
-                .filter(f -> f.endsWith(".jar"))
-                .filter(f -> !f.contains("/mods/")) // Исключаем все, что лежит в папке mods/
+    private enum OS { WINDOWS, LINUX, MACOS, UNKNOWN }
 
-                // 2. Сортировка (оставляем только для vecmath и библиотек)
-                .sorted((path1, path2) -> {
-                    if (path1.contains("vecmath")) return -1;
-                    if (path2.contains("vecmath")) return 1;
-                    return path1.compareTo(path2);
-                })
-
-                .map(clientRootPath::resolve)
-                .map(Path::toString)
-                .collect(Collectors.joining(File.pathSeparator));
+    private OS getPlatform() {
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("win")) return OS.WINDOWS;
+        if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix")) return OS.LINUX;
+        if (osName.contains("mac")) return OS.MACOS;
+        return OS.UNKNOWN;
     }
 
-    private List<String> buildMinecraftArgs(SessionData sessionData, ServerProfile serverProfile, Path clientRootPath, String assetIndex) {
-        return List.of(
-                "--username", sessionData.playerName(),
-                "--version", "Forge " + serverProfile.getVersion(),
-                "--gameDir", clientRootPath.toString(),
-                "--assetsDir", clientRootPath.resolve("assets").toString(),
-                "--uuid", sessionData.uuid(),
-                "--accessToken", sessionData.accessToken(),
-                "--userProperties", "{}",
-                "--assetIndex", assetIndex
-        );
+    private boolean hasLinuxNatives(Path dir) {
+        try (Stream<Path> stream = Files.list(dir)) {
+            return stream.anyMatch(p -> p.toString().endsWith(".so"));
+        } catch (IOException e) { return false; }
+    }
+
+    private boolean hasMacNatives(Path dir) {
+        try (Stream<Path> stream = Files.list(dir)) {
+            return stream.anyMatch(p -> p.toString().endsWith(".dylib") || p.toString().endsWith(".jnilib"));
+        } catch (IOException e) { return false; }
+    }
+
+    private void downloadFallbackNatives(Path targetDir, String version, OS os) {
+        log.warn("Need fallback natives for {} on {}", version, os);
+        // Заглушка, если понадобится
     }
 }

@@ -30,5 +30,5 @@ public interface IFileDownloadService {
      * @return Количество успешно загруженных файлов.
      * @throws IOException в случае, если один из файлов не удалось загрузить (может быть заменено на сбор ошибок).
      */
-    int downloadMissingFiles(Path basePath, Map<String, String> filesToDownload, Consumer<String> progressConsumer) throws IOException;
+    int downloadMissingFiles(Path basePath, String serverId, Map<String, String> filesToDownload, Consumer<String> progressConsumer) throws IOException;
 }

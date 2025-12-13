@@ -37,7 +37,6 @@ public class FileDownloadService implements IFileDownloadService {
     private final Path globalUpdatesDir;
 
     // --- ЧЕРНЫЙ СПИСОК (Опциональные/Конфликтные моды) ---
-    // Лаунчер будет ИГНОРИРОВАТЬ эти файлы при скачивании.
     private static final List<String> OPTIONAL_MODS_BLACKLIST = List.of(
             "ReplayMod",
             "FoamFix",
@@ -56,7 +55,7 @@ public class FileDownloadService implements IFileDownloadService {
      * Точка входа для контроллера.
      */
     public void processSession(SessionData session, String serverId, Consumer<String> progressUI) throws IOException {
-        logger.info("Processing session for server: " + serverId);
+        logger.info("Processing session for server: {}", serverId);
 
         JsonElement clientJson = gson.toJsonTree(session.fileManifest());
         if (!clientJson.isJsonObject()) {
@@ -71,13 +70,13 @@ public class FileDownloadService implements IFileDownloadService {
         Map<String, String> filesToDownload = new HashMap<>();
         flattenJsonTree(clientJson.getAsJsonObject(), "", filesToDownload);
 
-        logger.info("Total files found in manifest: " + filesToDownload.size());
+        logger.info("Total files found in manifest: {}", filesToDownload.size());
         if (progressUI != null) progressUI.accept("Проверка целостности...");
 
-        // 2. Вызываем метод загрузки
-        int downloaded = downloadMissingFiles(serverBaseDir, filesToDownload, progressUI);
+        // 2. Вызываем метод загрузки (передаем serverId для коррекции путей)
+        int downloaded = downloadMissingFiles(serverBaseDir, serverId, filesToDownload, progressUI);
 
-        logger.info("Download complete. Files downloaded: " + downloaded);
+        logger.info("Download complete. Files downloaded: {}", downloaded);
         if (progressUI != null) progressUI.accept("Готово! Загружено файлов: " + downloaded);
     }
 
@@ -116,46 +115,56 @@ public class FileDownloadService implements IFileDownloadService {
         return DOWNLOAD_BASE_URL + relativePath.replace(" ", "%20");
     }
 
-    @Override
-    public int downloadMissingFiles(Path basePath, Map<String, String> filesToDownload, Consumer<String> progressConsumer) throws IOException {
+    /**
+     * Основной метод загрузки с исправлением путей
+     */
+    public int downloadMissingFiles(Path basePath, String serverId, Map<String, String> filesToDownload, Consumer<String> progressConsumer) throws IOException {
         AtomicInteger downloadedCount = new AtomicInteger(0);
         int total = filesToDownload.size();
         AtomicInteger current = new AtomicInteger(0);
 
         for (Map.Entry<String, String> entry : filesToDownload.entrySet()) {
-            String relPath = entry.getKey();
+            String rawPath = entry.getKey(); // Путь как он пришел из манифеста
             String expectedMd5 = entry.getValue();
-            Path targetFile = basePath.resolve(relPath);
+
+            // --- 1. ЛОГИКА ДЛЯ ЛОКАЛЬНОГО ФАЙЛА (Чинит Industrial) ---
+            // Если путь начинается с имени сервера, убираем его, чтобы не было дублей папок
+            String localRelPath = rawPath;
+            if (localRelPath.startsWith(serverId + "/")) {
+                localRelPath = localRelPath.substring(serverId.length() + 1);
+            }
+            Path targetFile = basePath.resolve(localRelPath);
+
+            // --- 2. ЛОГИКА ДЛЯ URL СКАЧИВАНИЯ (Чинит RPG и Shared Libs) ---
+            String remoteRelPath = getRelPath(serverId, rawPath);
 
             // --- ФИЛЬТР: Пропускаем опасные моды ---
             boolean isBanned = OPTIONAL_MODS_BLACKLIST.stream()
-                    .anyMatch(relPath::contains);
+                    .anyMatch(localRelPath::contains);
 
             if (isBanned) {
-                logger.info("🚫 SKIPPING unstable/optional mod: {}", relPath);
-                // Увеличиваем счетчик прогресса, чтобы UI не завис
+                logger.info("🚫 SKIPPING unstable/optional mod: {}", relPathForLog(localRelPath));
                 if (progressConsumer != null) {
                     current.incrementAndGet();
                 }
-                continue; // Не качаем!
+                continue;
             }
-            // ---------------------------------------
 
             // Обновляем UI
             if (progressConsumer != null) {
                 int c = current.incrementAndGet();
                 if (c % 5 == 0 || c == total) {
-                    progressConsumer.accept(String.format("Загрузка: %d/%d (%s)", c, total, relPath));
+                    progressConsumer.accept(String.format("Загрузка: %d/%d (%s)", c, total, relPathForLog(localRelPath)));
                 }
             }
 
             // Проверка и загрузка
             if (needDownload(targetFile, expectedMd5)) {
                 try {
-                    downloadFile(relPath, targetFile);
+                    downloadFile(remoteRelPath, targetFile);
                     downloadedCount.incrementAndGet();
                 } catch (IOException e) {
-                    logger.error("Failed to download: {}", relPath, e);
+                    logger.error("Failed to download URL: {}", getFileUrl(remoteRelPath), e);
                     throw e;
                 }
             }
@@ -163,7 +172,31 @@ public class FileDownloadService implements IFileDownloadService {
         return downloadedCount.get();
     }
 
+    @NotNull
+    private static String getRelPath(String serverId, String rawPath) {
+        String remoteRelPath = rawPath;
+
+        // Список общих папок, которые лежат в корне сервера (НЕ внутри папки профиля)
+        boolean isSharedFolder = remoteRelPath.startsWith("libraries") ||
+                remoteRelPath.startsWith("bin") ||
+                remoteRelPath.startsWith("assets");
+
+        // Добавляем префикс сервера, ТОЛЬКО если это НЕ общая папка и префикса еще нет
+        if (!isSharedFolder && !remoteRelPath.startsWith(serverId + "/")) {
+            remoteRelPath = serverId + "/" + remoteRelPath;
+        }
+        return remoteRelPath;
+    }
+
     // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ---
+
+    private String relPathForLog(String path) {
+        // Укорачиваем длинные пути для UI
+        if (path.length() > 30) {
+            return "..." + path.substring(path.length() - 30);
+        }
+        return path;
+    }
 
     private void flattenJsonTree(JsonObject dirObject, String currentPath, Map<String, String> filesMap) {
         if (dirObject.has("files")) {
@@ -219,5 +252,4 @@ public class FileDownloadService implements IFileDownloadService {
         }
         return sb.toString();
     }
-
 }
