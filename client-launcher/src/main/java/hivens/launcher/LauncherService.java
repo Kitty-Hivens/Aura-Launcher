@@ -92,6 +92,7 @@ public class LauncherService implements ILauncherService {
             jvmArgs.add("-XX:G1ReservePercent=20");
             jvmArgs.add("-XX:MaxGCPauseMillis=50");
             jvmArgs.add("-XX:G1HeapRegionSize=32M");
+            jvmArgs.add("-Djava.net.preferIPv4Stack=true");
             // Forge флаги
             jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
             jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
