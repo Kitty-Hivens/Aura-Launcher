@@ -1,214 +1,374 @@
 package hivens.launcher;
 
+import hivens.core.api.ILauncherService;
+import hivens.core.api.IManifestProcessorService;
+import hivens.core.data.FileManifest;
 import hivens.core.api.model.ServerProfile;
 import hivens.core.data.SessionData;
-import hivens.utils.JavaHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
-/**
- * Сервис запуска клиента Minecraft.
- * Отвечает за сборку команды запуска, настройку JVM и старт процесса.
- */
-public class LauncherService {
+public class LauncherService implements ILauncherService {
 
-    private static final Logger logger = LoggerFactory.getLogger(LauncherService.class);
+    private static final Logger log = LoggerFactory.getLogger(LauncherService.class);
 
-    /**
-     * Запускает клиент Minecraft для указанного сервера.
-     *
-     * @param session       Данные сессии пользователя (токен, UUID).
-     * @param serverProfile Профиль сервера (версия, IP, порт).
-     * @return Объект Process запущенной игры.
-     * @throws IOException Если не удалось запустить процесс.
-     */
-    public Process launch(SessionData session, ServerProfile serverProfile) throws IOException {
-        logger.info("Preparing to launch server: {}", serverProfile.getName());
+    private static final String FORCED_JAVA_8_PATH = "/usr/lib/jvm/liberica-jdk-8-full/bin/java";
 
-        // 1. Определяем пути
-        Path clientDir = Paths.get(SettingsService.getGlobal().clientDir, serverProfile.getName());
-        Path assetsDir = Paths.get(SettingsService.getGlobal().clientDir, "assets");
-        Path nativesDir = clientDir.resolve("natives");
+    private final IManifestProcessorService manifestProcessor;
+    private final Map<String, LaunchConfig> launchConfigs;
 
-        // 2. Собираем аргументы JVM (память, джава, флаги)
-        List<String> command = buildJvmArgs(serverProfile, clientDir, nativesDir);
+    private record LaunchConfig(
+            String mainClass,
+            String tweakClass,
+            String assetIndex,
+            List<String> jvmArgs,
+            String nativesDir
+    ) {}
 
-        // 3. Добавляем Main Class
-        // Для 1.12.2 (Forge) это обычно net.minecraft.launchwrapper.Launch
-        // Если у тебя есть поддержка версий выше 1.13, тут нужна проверка версии
-        String mainClass = "net.minecraft.launchwrapper.Launch";
-        command.add(mainClass);
-
-        // 4. Собираем аргументы Клиента (логин, пути, сервер)
-        command.addAll(buildGameArgs(session, serverProfile, clientDir, assetsDir));
-
-        // 5. Логируем команду (скрывая токен для безопасности)
-        logCommand(command);
-
-        // 6. Запуск
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(clientDir.toFile());
-        builder.redirectErrorStream(true); // Объединяем stdout и stderr
-
-        // Чистим переменные окружения, чтобы не мешали Java
-        Map<String, String> env = builder.environment();
-        env.remove("_JAVA_OPTIONS");
-        env.remove("JAVA_TOOL_OPTIONS");
-        env.remove("CLASSPATH");
-
-        logger.info("Starting Minecraft process...");
-        return builder.start();
+    public LauncherService(IManifestProcessorService manifestProcessor) {
+        this.manifestProcessor = Objects.requireNonNull(manifestProcessor, "ManifestProcessorService cannot be null");
+        this.launchConfigs = buildLaunchConfigMap();
     }
 
-    /**
-     * Формирует список аргументов для JVM (Java Virtual Machine).
-     */
-    private List<String> buildJvmArgs(ServerProfile profile, Path clientDir, Path nativesDir) {
-        List<String> args = new ArrayList<>();
+    @Override
+    public Process launchClient(
+            SessionData sessionData,
+            ServerProfile serverProfile,
+            Path clientRootPath,
+            Path javaExecutablePath,
+            int allocatedMemoryMB
+    ) throws IOException {
 
-        // -- Исполняемый файл Java --
-        // Используем наш умный JavaHelper
-        args.add(JavaHelper.getJavaPath());
+        Objects.requireNonNull(sessionData, "SessionData cannot be null");
+        Objects.requireNonNull(serverProfile, "ServerProfile cannot be null");
 
-        // -- Память --
-        // Берем эффективное значение (учитывает настройки сервера, глобальные и авто-режим)
-        int ramMb = SettingsService.getEffectiveRam(profile.getName());
-        args.add("-Xmx" + ramMb + "M");
-        // Минимальную память можно ставить поменьше, чтобы Java не отжирала сразу всё
-        args.add("-Xms512M");
+        String version = serverProfile.getVersion();
+        LaunchConfig config = launchConfigs.get(version);
 
-        // -- Флаги производительности (GC) --
-        args.add("-XX:+UseG1GC");
-        args.add("-XX:+UnlockExperimentalVMOptions");
-        args.add("-XX:G1NewSizePercent=20");
-        args.add("-XX:G1ReservePercent=20");
-        args.add("-XX:MaxGCPauseMillis=50");
-        args.add("-XX:G1HeapRegionSize=32M");
+        if (config == null) {
+            log.error("Missing hardcoded LaunchConfig for version: {}. Aborting.", version);
+            throw new IOException("No launch configuration found for version: " + version);
+        }
 
-        // -- Флаги совместимости --
-        args.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
-        args.add("-Dfml.ignorePatchDiscrepancies=true");
+        // --- ЭТАП 0: ЗАЧИСТКА ВРАГОВ (ReplayMod и т.д.) ---
+        deleteBannedMods(clientRootPath);
 
-        // [CRITICAL] Флаг для Linux, чтобы не было "Timed Out" при подключении
-        args.add("-Djava.net.preferIPv4Stack=true");
+        // --- ЭТАП 1: Подготовка нативов ---
+        prepareNatives(clientRootPath, config.nativesDir(), version);
 
-        // -- Брендинг (чтобы сервер видел нас как "родной" лаунчер) --
-        args.add("-Dminecraft.launcher.brand=SmartyCraft");
-        args.add("-Dlauncher.version=3.6.2"); // Версия из оригинала
+        // --- ЭТАП 1.5: Подготовка Ассетов (НОВОЕ: Фикс звуков) ---
+        prepareAssets(clientRootPath, "assets-" + version + ".zip");
 
-        // -- Пути к нативным библиотекам --
-        args.add("-Djava.library.path=" + nativesDir.toAbsolutePath());
-
-        // -- Classpath (библиотеки + майнкрафт) --
-        // Здесь должен быть список всех jar-файлов через разделитель
-        // В реальном коде ты должен получить этот список от FileDownloadService или ManifestProcessor
-        String classpath = getClasspath(clientDir);
-        args.add("-cp");
-        args.add(classpath);
-
-        return args;
-    }
-
-    /**
-     * Формирует аргументы самой игры.
-     */
-    private List<String> buildGameArgs(SessionData session, ServerProfile profile, Path gameDir, Path assetsDir) {
-        List<String> args = new ArrayList<>();
-
-        // Аутентификация
-        args.add("--username");
-        args.add(session.playerName());
-        args.add("--uuid");
-        args.add(session.uuid());
-        args.add("--accessToken");
-        args.add(session.accessToken()); // Наш расшифрованный токен!
-
-        // Тип пользователя (важно для Forge)
-        args.add("--userType");
-        args.add("mojang");
-        args.add("--versionType");
-        args.add("Forge");
-
-        // Версия и пути
-        args.add("--version");
-        args.add(profile.getVersion()); // Например "1.12.2"
-        args.add("--gameDir");
-        args.add(gameDir.toAbsolutePath().toString());
-        args.add("--assetsDir");
-        args.add(assetsDir.toAbsolutePath().toString());
-        args.add("--assetIndex");
-        args.add(getAssetIndex(profile.getVersion())); // Обычно совпадает с версией
-
-        // Настройки окна
-        if (SettingsService.getGlobal().fullScreen) {
-            args.add("--fullscreen");
-            args.add("true");
+        // --- ЭТАП 2: Выбор Java (Форсируем Java 8 для 1.12.2) ---
+        String actualJavaPath;
+        if ("1.12.2".equals(version)) {
+            log.warn("FORCE OVERRIDE: Using Java 8 for 1.12.2 -> {}", FORCED_JAVA_8_PATH);
+            actualJavaPath = FORCED_JAVA_8_PATH;
         } else {
-            args.add("--width"); args.add("925");
-            args.add("--height"); args.add("530");
+            actualJavaPath = javaExecutablePath.toString();
         }
 
-        // Авто-подключение к серверу
-        if (SettingsService.getGlobal().autoConnect) {
-            logger.info("Auto-connect enabled for {}", profile.getAddress());
-            args.add("--server");
-            args.add(profile.getAddress());
-            args.add("--port");
-            args.add(String.valueOf(profile.getPort()));
+        List<String> jvmArgs = new ArrayList<>();
+        jvmArgs.add(actualJavaPath);
+
+        // --- ЭТАП 3: Аргументы JVM ---
+        if ("1.12.2".equals(version)) {
+            // Аргументы G1GC для 1.12.2
+            jvmArgs.add("-XX:+UseG1GC");
+            jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
+            jvmArgs.add("-XX:G1NewSizePercent=20");
+            jvmArgs.add("-XX:G1ReservePercent=20");
+            jvmArgs.add("-XX:MaxGCPauseMillis=50");
+            jvmArgs.add("-XX:G1HeapRegionSize=32M");
+            jvmArgs.add("-Djava.net.preferIPv4Stack=true");
+            // Forge флаги
+            jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
+            jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
+            jvmArgs.add("-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/");
+            jvmArgs.add("-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/");
+            jvmArgs.add("-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/");
+        } else if("1.7.10".equals(version)) {
+            // Аргументы для 1.7.10
+            jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
+            jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
+            jvmArgs.add("-XX:+UseG1GC");
+            // ... остальные флаги GC, если нужны ...
         }
+
+        // Добавляем флаги из конфига (там лежат брендовые флаги SmartyCraft!)
+        jvmArgs.addAll(config.jvmArgs());
+
+        // Память
+        jvmArgs.add("-Xms512M");
+        jvmArgs.add("-Xmx" + allocatedMemoryMB + "M");
+
+        // Путь к нативам
+        Path nativesPath = clientRootPath.resolve(config.nativesDir());
+        jvmArgs.add("-Djava.library.path=" + nativesPath.toAbsolutePath());
+
+        // Classpath
+        jvmArgs.add("-cp");
+        jvmArgs.add(buildClasspath(clientRootPath, sessionData.fileManifest()));
+
+        // Main Class
+        jvmArgs.add(config.mainClass());
+
+        // --- ЭТАП 4: Аргументы Minecraft (С ФИКСОМ BAD SESSION) ---
+        jvmArgs.addAll(buildMinecraftArgs(sessionData, serverProfile, clientRootPath, config.assetIndex()));
+
+        // TweakClass
+        if (config.tweakClass() != null) {
+            jvmArgs.add("--tweakClass");
+            jvmArgs.add(config.tweakClass());
+        }
+
+        log.debug("Assembled launch command: {}", String.join(" ", jvmArgs));
+
+        ProcessBuilder pb = new ProcessBuilder(jvmArgs);
+        pb.directory(clientRootPath.toFile());
+        pb.redirectErrorStream(true);
+
+        log.info("Launching client process for user {} (Version: {})...", sessionData.playerName(), version);
+
+        Process process = pb.start();
+
+        // Читаем вывод процесса (GameOutputReader)
+        new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println("[GAME] " + line);
+                }
+            } catch (IOException e) {
+                // Игнорируем
+            }
+        }, "GameOutputReader").start();
+
+        return process;
+    }
+
+    private List<String> buildMinecraftArgs(SessionData sessionData, ServerProfile serverProfile, Path clientRootPath, String assetIndex) {
+
+        // ВАЖНО: UUID берется из SessionData (где он уже очищен от дефисов)
+
+        List<String> args = new ArrayList<>();
+        args.add("--username");
+        args.add(sessionData.playerName());
+        args.add("--version");
+        args.add("Forge " + serverProfile.getVersion());
+        args.add("--gameDir");
+        args.add(clientRootPath.toString());
+        args.add("--assetsDir");
+        args.add(clientRootPath.resolve("assets").toString());
+        args.add("--assetIndex");
+        args.add(assetIndex);
+        args.add("--uuid");
+        args.add(sessionData.uuid());
+        args.add("--accessToken");
+        args.add(sessionData.accessToken());
+        args.add("--userProperties");
+        args.add("{}");
+
+        // --- ВОЗВРАЩЕНЫЕ ФЛАГИ ИЗ ОРИГИНАЛА ---
+        args.add("--userType");
+        args.add("mojang"); // <-- ВОЗВРАЩЕН: Оригинал его использует
+        args.add("--versionType");
+        args.add("Forge"); // <-- ВОЗВРАЩЕН
+
+        // Если ты хочешь вернуть размеры окна, тоже добавь (по умолчанию 854x480)
+        // args.add("--width"); args.add("854");
+        // args.add("--height"); args.add("480");
 
         return args;
     }
 
-    // Вспомогательный метод для сборки Classpath
-    // В реальном проекте это может быть сложнее (зависит от того, как ты хранишь библиотеки)
-    private String getClasspath(Path clientDir) {
-        // Пример простой реализации: сканируем папку libraries и добавляем minecraft.jar
-        StringBuilder cp = new StringBuilder();
-        String separator = File.pathSeparator;
+    private void prepareNatives(Path clientRoot, String nativesDirName, String version) {
+        Path binDir = clientRoot.resolve("bin");
+        Path nativesDir = clientRoot.resolve(nativesDirName);
+        OS currentOS = getPlatform();
 
-        File libsDir = clientDir.resolve("libraries").toFile();
-        if (libsDir.exists() && libsDir.isDirectory()) {
-            File[] files = libsDir.listFiles((dir, name) -> name.endsWith(".jar"));
-            if (files != null) {
-                for (File f : files) {
-                    cp.append(f.getAbsolutePath()).append(separator);
+        String targetZipName = "natives-" + version + ".zip";
+        Path nativesZip = binDir.resolve(targetZipName);
+
+        if (Files.exists(nativesZip)) {
+            File dir = nativesDir.toFile();
+            if (!dir.exists() || (dir.listFiles() != null && Objects.requireNonNull(dir.listFiles()).length == 0)) {
+                log.info("Extracting natives from {}...", nativesZip);
+                try {
+                    unzip(nativesZip.toFile(), nativesDir.toFile());
+
+                    if (currentOS == OS.LINUX && !hasLinuxNatives(nativesDir)) {
+                        log.warn("⚠️ Нативы распакованы, но файлов .so не найдено! Качаем аварийный комплект Linux...");
+                        downloadFallbackNatives(nativesDir, version, OS.LINUX);
+                    } else if (currentOS == OS.MACOS && !hasMacNatives(nativesDir)) {
+                        log.warn("⚠️ Нативы распакованы, но файлов .dylib не найдено! Качаем аварийный комплект Mac...");
+                        downloadFallbackNatives(nativesDir, version, OS.MACOS);
+                    }
+
+                } catch (IOException e) {
+                    log.error("Failed to unzip natives!", e);
+                }
+            }
+        } else {
+            log.warn("Natives archive not found: {}", nativesZip);
+            if (currentOS != OS.WINDOWS) {
+                downloadFallbackNatives(nativesDir, version, currentOS);
+            }
+        }
+    }
+
+    // --- НОВЫЙ МЕТОД: РАСПАКОВКА АССЕТОВ ---
+    private void prepareAssets(Path clientRoot, String assetsZipName) {
+        Path assetsDir = clientRoot.resolve("assets");
+        Path assetsZip = clientRoot.resolve(assetsZipName);
+
+        // Если архив скачан, но папка indexes пуста или отсутствует - распаковываем
+        if (Files.exists(assetsZip)) {
+            if (!Files.exists(assetsDir.resolve("indexes"))) {
+                log.info("Extracting assets from {}...", assetsZip);
+                try {
+                    unzip(assetsZip.toFile(), assetsDir.toFile());
+                } catch (IOException e) {
+                    log.error("Failed to unzip assets!", e);
                 }
             }
         }
-
-        // Добавляем сам minecraft.jar (обычно он лежит в bin или versions)
-        // Путь зависит от твоей структуры папок. Предположим bin/minecraft.jar
-        cp.append(clientDir.resolve("bin").resolve("minecraft.jar").toAbsolutePath());
-
-        return cp.toString();
     }
 
-    // Определение индекса ассетов (для 1.7.10 это может быть "1.7.10", для 1.12.2 - "1.12")
-    private String getAssetIndex(String version) {
-        if (version.equals("1.7.10")) return "1.7.10";
-        if (version.startsWith("1.12")) return "1.12";
-        return version; // Фолбэк
-    }
+    private static void unzip(File zipFile, File destDir) throws IOException {
+        if (!destDir.exists()) destDir.mkdirs();
+        byte[] buffer = new byte[1024];
+        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile))) {
+            ZipEntry zipEntry = zis.getNextEntry();
+            while (zipEntry != null) {
+                File newFile = new File(destDir, zipEntry.getName());
 
-    private void logCommand(List<String> command) {
-        // Копируем список, чтобы не менять оригинал
-        List<String> safeCommand = new ArrayList<>(command);
-        for (int i = 0; i < safeCommand.size(); i++) {
-            if (safeCommand.get(i).equals("--accessToken")) {
-                if (i + 1 < safeCommand.size()) {
-                    safeCommand.set(i + 1, "********"); // Прячем токен в логах
+                // Защита Zip Slip
+                if (!newFile.getCanonicalPath().startsWith(destDir.getCanonicalPath() + File.separator)) {
+                    throw new IOException("Entry is outside of the target dir: " + zipEntry.getName());
                 }
+
+                if (zipEntry.isDirectory()) {
+                    if (!newFile.isDirectory() && !newFile.mkdirs()) throw new IOException("Failed to create dir " + newFile);
+                } else {
+                    File parent = newFile.getParentFile();
+                    if (!parent.isDirectory() && !parent.mkdirs()) throw new IOException("Failed to create dir " + parent);
+                    try (FileOutputStream fos = new FileOutputStream(newFile)) {
+                        int len;
+                        while ((len = zis.read(buffer)) > 0) fos.write(buffer, 0, len);
+                    }
+                }
+                zipEntry = zis.getNextEntry();
             }
+            zis.closeEntry();
         }
-        logger.debug("Launch command: {}", String.join(" ", safeCommand));
+    }
+
+    private void deleteBannedMods(Path root) {
+        log.info("Scanning for banned mods...", root);
+        try (Stream<Path> walk = Files.walk(root)) {
+            walk.filter(p -> p.toString().contains("ReplayMod")) // или другие моды
+                    .map(Path::toFile)
+                    .forEach(file -> {
+                        if (file.delete()) {
+                            log.warn("🔥🔥🔥 DELETED BANNED MOD: {} 🔥🔥🔥", file.getAbsolutePath());
+                        }
+                    });
+        } catch (IOException e) {
+            log.error("Error cleaning mods", e);
+        }
+    }
+
+    private String buildClasspath(Path clientRootPath, FileManifest manifest) {
+        return manifestProcessor.flattenManifest(manifest).keySet().stream()
+                .filter(f -> f.endsWith(".jar"))
+                .filter(f -> !f.contains("/mods/"))
+                .sorted((path1, path2) -> {
+                    if (path1.contains("vecmath")) return -1;
+                    if (path2.contains("vecmath")) return 1;
+                    return path1.compareTo(path2);
+                })
+                .map(clientRootPath::resolve)
+                .map(Path::toString)
+                .collect(Collectors.joining(File.pathSeparator));
+    }
+
+    private Map<String, LaunchConfig> buildLaunchConfigMap() {
+        return Map.of(
+                "1.7.10", new LaunchConfig(
+                        "net.minecraft.launchwrapper.Launch",
+                        "cpw.mods.fml.common.launcher.FMLTweaker",
+                        "1.7.10",
+                        List.of(
+                                "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true",
+                                "-Dminecraft.launcher.brand=smartycraft",
+                                "-Dlauncher.version=3.0.0"
+                        ),
+                        "bin/natives-1.7.10"
+                ),
+                "1.12.2", new LaunchConfig(
+                        "net.minecraft.launchwrapper.Launch",
+                        "net.minecraftforge.fml.common.launcher.FMLTweaker",
+                        "1.12.2",
+                        List.of(
+                                "-XX:+UseG1GC",
+                                "-XX:+UnlockExperimentalVMOptions",
+                                "-XX:G1NewSizePercent=20",
+                                // ... (остальные XX флаги)...
+                                "-Dfml.ignoreInvalidMinecraftCertificates=true",
+                                "-Dfml.ignorePatchDiscrepancies=true",
+                                // ВОТ ЗДЕСЬ УБИРАЕМ ВСЕ ЛИШНЕЕ
+                                "-Dminecraft.launcher.brand=SmartyCraft",
+                                "-Dlauncher.version=3.0.0"
+                        ),
+                        "bin/natives-1.12.2"
+                ),
+                "1.21.1", new LaunchConfig(
+                        "cpw.mods.bootstraplauncher.BootstrapLauncher",
+                        null,
+                        "1.21.1",
+                        List.of("-Dminecraft.launcher.brand=smartycraft"),
+                        "bin/natives-1.21.1"
+                )
+        );
+    }
+
+    private enum OS { WINDOWS, LINUX, MACOS, UNKNOWN }
+
+    private OS getPlatform() {
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("win")) return OS.WINDOWS;
+        if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix")) return OS.LINUX;
+        if (osName.contains("mac")) return OS.MACOS;
+        return OS.UNKNOWN;
+    }
+
+    private boolean hasLinuxNatives(Path dir) {
+        try (Stream<Path> stream = Files.list(dir)) {
+            return stream.anyMatch(p -> p.toString().endsWith(".so"));
+        } catch (IOException e) { return false; }
+    }
+
+    private boolean hasMacNatives(Path dir) {
+        try (Stream<Path> stream = Files.list(dir)) {
+            return stream.anyMatch(p -> p.toString().endsWith(".dylib") || p.toString().endsWith(".jnilib"));
+        } catch (IOException e) { return false; }
+    }
+
+    private void downloadFallbackNatives(Path targetDir, String version, OS os) {
+        log.warn("Need fallback natives for {} on {}", version, os);
+        // Заглушка, если понадобится
     }
 }
