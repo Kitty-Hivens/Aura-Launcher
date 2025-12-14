@@ -1,96 +1,170 @@
 package hivens.ui;
 
-import hivens.core.api.ISettingsService;
-import hivens.core.data.SettingsData;
+import hivens.launcher.SettingsService;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.TextField;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javafx.scene.control.*;
+import javafx.scene.input.MouseEvent;
+import javafx.stage.DirectoryChooser;
 
-import java.io.IOException;
+import java.io.File;
+import java.util.Arrays;
+import java.util.List;
 
 /**
- * Контроллер для Settings.fxml.
+ * Контроллер экрана настроек.
+ * Привязывается к fxml/Settings.fxml (замени fx:controller="ae" на этот класс!).
  */
 public class SettingsController {
 
-    private static final Logger log = LoggerFactory.getLogger(SettingsController.class);
+    // === Элементы интерфейса (fx:id совпадают с FXML) ===
+    @FXML private Slider memorySlider;
+    @FXML private CheckBox memoryAutoCheck;
+    @FXML private Label memoryAutoTitle; // Текст "Автоматически" или статус
 
-    @FXML private TextField javaPathField;
-    @FXML private TextField memoryField;
-    @FXML private TextField themePathField;
-    @FXML private Button saveButton;
-    @FXML private Button cancelButton;
+    @FXML private CheckBox fullScreenCheck;
+    @FXML private CheckBox autoConnectCheck;
+    @FXML private CheckBox oneClickCheck;
+    @FXML private CheckBox offlineCheck;
+    @FXML private CheckBox testModeCheck; // Debug mode
 
-    private final ISettingsService settingsService;
-    private final Main mainApp;
-    private SettingsData currentSettings;
+    @FXML private Hyperlink folderPath;
+    @FXML private Button folderChoose;
+    @FXML private Button folderReset;
+    @FXML private Button back;
 
-    public SettingsController(LauncherDI di, Main mainApp) {
-        this.settingsService = di.getSettingsService();
-        this.mainApp = mainApp;
-    }
+    // Шаги слайдера памяти (1Gb, 1.5Gb ... 8Gb) - копируем логику оригинала для удобства
+    private final List<Integer> ramSteps = Arrays.asList(
+            1024, 1536, 2048, 2560, 3072, 3584, 4096, 5120, 6144, 8192
+    );
 
     @FXML
     public void initialize() {
-        saveButton.setOnAction(event -> onSaveClick());
-        cancelButton.setOnAction(event -> onCancelClick());
+        setupSlider();
+        loadSettingsToUi();
 
-        loadSettings();
+        // Добавляем слушатели на чекбоксы для авто-сохранения
+        setupAutoSave();
     }
 
-    private void loadSettings() {
-        try {
-            this.currentSettings = settingsService.loadSettings();
-            javaPathField.setText(currentSettings.javaPath());
-            memoryField.setText(String.valueOf(currentSettings.memoryMB()));
-            themePathField.setText(currentSettings.customThemePath());
-        } catch (IOException e) {
-            log.error("Failed to load settings", e);
+    private void setupSlider() {
+        memorySlider.setMin(0);
+        memorySlider.setMax(ramSteps.size() - 1);
+        memorySlider.setMajorTickUnit(1);
+        memorySlider.setMinorTickCount(0);
+        memorySlider.setSnapToTicks(true);
+
+        // При перетаскивании слайдера обновляем настройки
+        memorySlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            saveCurrentState();
+            // Тут можно добавить обновление текста лейбла, если нужно
+        });
+    }
+
+    /** Загрузка данных из SettingsService в UI. */
+    private void loadSettingsToUi() {
+        var global = SettingsService.getGlobal();
+
+        fullScreenCheck.setSelected(global.fullScreen);
+        autoConnectCheck.setSelected(global.autoConnect);
+        if (testModeCheck != null) testModeCheck.setSelected(global.debugMode);
+        if (offlineCheck != null) offlineCheck.setSelected(global.offlineMode);
+
+        // Память
+        if (memoryAutoCheck != null) {
+            memoryAutoCheck.setSelected(global.autoMemory);
+            memorySlider.setDisable(global.autoMemory);
         }
-    }
 
-    @FXML
-    private void onSaveClick() {
-        try {
-            int memory;
-            try {
-                memory = Integer.parseInt(memoryField.getText());
-                // Устанавливаем разумный минимум (512MB)
-                if (memory < 512) {
-                    log.warn("Invalid memory value entered: {}MB. Setting to 512.", memory);
-                    memory = 512;
-                    memoryField.setText("512");
-                }
-                // (Можно добавить и максимум, e.g., 32768)
-            } catch (NumberFormatException e) {
-                log.warn("Invalid memory value entered (Not a number). Using default.", e);
-                memory = SettingsData.defaults().memoryMB(); // 4096
-                memoryField.setText(String.valueOf(memory));
+        // Находим ближайшую позицию на слайдере для сохраненного RAM
+        int savedRam = global.ramMb;
+        int closestIndex = 0;
+        int minDiff = Integer.MAX_VALUE;
+        for (int i = 0; i < ramSteps.size(); i++) {
+            int diff = Math.abs(ramSteps.get(i) - savedRam);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestIndex = i;
             }
+        }
+        memorySlider.setValue(closestIndex);
 
-            SettingsData newSettings = new SettingsData(
-                    javaPathField.getText(),
-                    memory, // Используем проверенное значение
-                    themePathField.getText()
-            );
-            settingsService.saveSettings(newSettings);
-            this.currentSettings = newSettings;
+        // Путь
+        if (folderPath != null) folderPath.setText(global.clientDir);
+    }
 
-            mainApp.showLoginScene(); // (Возврат к главному экрану)
+    private void setupAutoSave() {
+        // Сохраняем при любом клике
+        fullScreenCheck.setOnAction(e -> saveCurrentState());
+        autoConnectCheck.setOnAction(e -> saveCurrentState());
+        if (testModeCheck != null) testModeCheck.setOnAction(e -> saveCurrentState());
+        if (offlineCheck != null) offlineCheck.setOnAction(e -> saveCurrentState());
+        if (memoryAutoCheck != null) memoryAutoCheck.setOnAction(e -> {
+            memorySlider.setDisable(memoryAutoCheck.isSelected());
+            saveCurrentState();
+        });
+    }
 
-        } catch (IOException e) {
-            log.error("Failed to save settings", e);
+    /** Сохранение состояния UI в конфиг. */
+    private void saveCurrentState() {
+        var global = SettingsService.getGlobal();
+
+        global.fullScreen = fullScreenCheck.isSelected();
+        global.autoConnect = autoConnectCheck.isSelected();
+        if (testModeCheck != null) global.debugMode = testModeCheck.isSelected();
+        if (offlineCheck != null) global.offlineMode = offlineCheck.isSelected();
+
+        if (memoryAutoCheck != null) {
+            global.autoMemory = memoryAutoCheck.isSelected();
+        }
+
+        // Если авто выключено - берем значение со слайдера
+        if (!global.autoMemory) {
+            int stepIndex = (int) memorySlider.getValue();
+            if (stepIndex >= 0 && stepIndex < ramSteps.size()) {
+                global.ramMb = ramSteps.get(stepIndex);
+            }
+        }
+
+        SettingsService.save();
+    }
+
+    // === FXML Actions (методы, вызываемые из fxml) ===
+
+    @FXML
+    private void clickBack(MouseEvent event) {
+        saveCurrentState();
+        // Возврат назад (скрываем текущее окно)
+        back.getScene().getWindow().hide();
+    }
+
+    // Дублирующие методы для совместимости со старым FXML (там методы назывались clickSettings...)
+    @FXML private void clickSettingsFullscreen() { saveCurrentState(); }
+    @FXML private void clickSettingsAutoConnect() { saveCurrentState(); }
+    @FXML private void clickSettingsTestMode() { saveCurrentState(); }
+    @FXML private void clickSettingsOffline() { saveCurrentState(); }
+    @FXML private void clickSettingsMemoryAuto() {
+        memorySlider.setDisable(memoryAutoCheck.isSelected());
+        saveCurrentState();
+    }
+    @FXML private void slideMemory(MouseEvent event) { saveCurrentState(); }
+
+    @FXML
+    private void clickChoose(MouseEvent event) {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Выберите папку клиента");
+        File file = chooser.showDialog(folderPath.getScene().getWindow());
+        if (file != null) {
+            SettingsService.getGlobal().clientDir = file.getAbsolutePath();
+            folderPath.setText(file.getAbsolutePath());
+            SettingsService.save();
         }
     }
 
     @FXML
-    private void onCancelClick() {
-        try {
-            mainApp.showLoginScene(); // (Возврат к главному экрану)
-        } catch (IOException e) {
-            log.error("Failed to return to Login scene", e);
-        }
+    private void clickClientFolderReset(MouseEvent event) {
+        String def = new File(System.getProperty("user.home"), ".SCOL/updates").getAbsolutePath();
+        SettingsService.getGlobal().clientDir = def;
+        folderPath.setText(def);
+        SettingsService.save();
     }
 }
