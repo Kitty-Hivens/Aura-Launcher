@@ -24,6 +24,9 @@ public final class ServiceEndpoints {
     /** * Базовый путь на CDN для загрузки файлов клиента (моды, библиотеки). */
     public static final String CLIENT_DOWNLOAD_BASE = BASE_URL + "/launcher/clients/";
 
+    public static final String AUTH_URL = "http://www.smartycraft.ru/launcher/auth.php";
+
+    public static final String REGISTER_URL = "http://www.smartycraft.ru/register";
     // NOTE: По мере необходимости сюда будут добавляться другие эндпоинты,
     // например, для списка клиентов или проверки хешей
 }

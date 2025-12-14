@@ -24,7 +24,6 @@ public class LauncherService implements ILauncherService {
 
     private static final Logger log = LoggerFactory.getLogger(LauncherService.class);
 
-    // ПУТЬ К JAVA 8 (Твой рабочий путь)
     private static final String FORCED_JAVA_8_PATH = "/usr/lib/jvm/liberica-jdk-8-full/bin/java";
 
     private final IManifestProcessorService manifestProcessor;
@@ -96,6 +95,9 @@ public class LauncherService implements ILauncherService {
             // Forge флаги
             jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
             jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
+            jvmArgs.add("-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/");
+            jvmArgs.add("-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/");
+            jvmArgs.add("-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/");
         } else if("1.7.10".equals(version)) {
             // Аргументы для 1.7.10
             jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
@@ -156,31 +158,39 @@ public class LauncherService implements ILauncherService {
         return process;
     }
 
-    // --- ФИКС: ОБНОВЛЕННЫЙ МЕТОД АРГУМЕНТОВ ---
     private List<String> buildMinecraftArgs(SessionData sessionData, ServerProfile serverProfile, Path clientRootPath, String assetIndex) {
-        // 1. Форматирование UUID (32 -> 36 chars) - КРИТИЧНО ДЛЯ 1.12.2
-        String uuid = sessionData.uuid();
-        if (uuid != null && uuid.length() == 32) {
-            uuid = uuid.replaceFirst(
-                    "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})",
-                    "$1-$2-$3-$4-$5"
-            );
-            log.info("Formatted UUID for legacy client: {} -> {}", sessionData.uuid(), uuid);
-        }
 
-        assert uuid != null;
-        return List.of(
-                "--username", sessionData.playerName(),
-                "--version", "Forge " + serverProfile.getVersion(),
-                "--gameDir", clientRootPath.toString(),
-                "--assetsDir", clientRootPath.resolve("assets").toString(),
-                "--assetIndex", assetIndex,
-                "--uuid", uuid,               // Исправленный UUID с дефисами
-                "--accessToken", sessionData.accessToken(),
-                "--userProperties", "{}",
-                "--userType", "legacy",       // <--- КЛЮЧЕВОЙ ФИКС BAD SESSION
-                "--versionType", "Forge"
-        );
+        // ВАЖНО: UUID берется из SessionData (где он уже очищен от дефисов)
+
+        List<String> args = new ArrayList<>();
+        args.add("--username");
+        args.add(sessionData.playerName());
+        args.add("--version");
+        args.add("Forge " + serverProfile.getVersion());
+        args.add("--gameDir");
+        args.add(clientRootPath.toString());
+        args.add("--assetsDir");
+        args.add(clientRootPath.resolve("assets").toString());
+        args.add("--assetIndex");
+        args.add(assetIndex);
+        args.add("--uuid");
+        args.add(sessionData.uuid());
+        args.add("--accessToken");
+        args.add(sessionData.accessToken());
+        args.add("--userProperties");
+        args.add("{}");
+
+        // --- ВОЗВРАЩЕНЫЕ ФЛАГИ ИЗ ОРИГИНАЛА ---
+        args.add("--userType");
+        args.add("mojang"); // <-- ВОЗВРАЩЕН: Оригинал его использует
+        args.add("--versionType");
+        args.add("Forge"); // <-- ВОЗВРАЩЕН
+
+        // Если ты хочешь вернуть размеры окна, тоже добавь (по умолчанию 854x480)
+        // args.add("--width"); args.add("854");
+        // args.add("--height"); args.add("480");
+
+        return args;
     }
 
     private void prepareNatives(Path clientRoot, String nativesDirName, String version) {
@@ -315,23 +325,10 @@ public class LauncherService implements ILauncherService {
                                 "-XX:+UseG1GC",
                                 "-XX:+UnlockExperimentalVMOptions",
                                 "-XX:G1NewSizePercent=20",
-                                "-XX:G1ReservePercent=20",
-                                "-XX:MaxGCPauseMillis=50",
-                                "-XX:G1HeapRegionSize=32M",
+                                // ... (остальные XX флаги)...
                                 "-Dfml.ignoreInvalidMinecraftCertificates=true",
                                 "-Dfml.ignorePatchDiscrepancies=true",
-
-                                // --- ФИКС АВТОРИЗАЦИИ (HTTP) ---
-                                // Указываем базовый URL без https
-                                "-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/",
-                                "-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/",
-                                "-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/",
-                                "-Dminecraft.api.services.host=http://www.smartycraft.ru/launcher/",
-
-                                // Некоторые патченые authlib ищут это свойство:
-                                "-Dauthlib.remote.connection=http://www.smartycraft.ru/launcher/",
-
-                                // Бренд и версия (попробуем с большой буквы)
+                                // ВОТ ЗДЕСЬ УБИРАЕМ ВСЕ ЛИШНЕЕ
                                 "-Dminecraft.launcher.brand=SmartyCraft",
                                 "-Dlauncher.version=3.0.0"
                         ),
