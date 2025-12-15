@@ -60,7 +60,7 @@ public class Main extends Application {
         // loader.setControllerFactory(...);
 
         Parent root = loader.load();
-        primaryStage.setTitle("SCOL - Вход");
+        primaryStage.setTitle("Aura Launcher");
         primaryStage.setScene(new Scene(root));
         primaryStage.show();
     }

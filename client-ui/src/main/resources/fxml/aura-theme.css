@@ -1,0 +1,57 @@
+/* Окно настроек */
+.settings-window {
+    -fx-background-color: transparent; /* Прозрачность для закругленных углов */
+}
+
+/* Вкладки */
+.aura-tabs .tab-header-area .tab-header-background {
+    -fx-background-color: transparent;
+}
+.aura-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-text-fill: #888;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-border-color: transparent transparent #444 transparent;
+    -fx-border-width: 2px;
+}
+.aura-tabs .tab:selected {
+    -fx-text-fill: white;
+    -fx-border-color: transparent transparent #00aaff transparent;
+}
+.aura-tabs .tab-content-area {
+    -fx-background-color: rgba(0, 0, 0, 0.3);
+    -fx-background-radius: 10;
+}
+
+/* Поля ввода */
+.aura-input {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-text-fill: white;
+    -fx-background-radius: 5;
+    -fx-border-color: rgba(255,255,255,0.2);
+    -fx-border-radius: 5;
+}
+.setting-label {
+    -fx-text-fill: #ccc;
+    -fx-font-size: 14px;
+}
+
+/* Кнопки */
+.aura-btn-primary {
+    -fx-background-color: #00aaff;
+    -fx-text-fill: white;
+    -fx-background-radius: 20;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-padding: 8 25;
+}
+.aura-btn-secondary {
+    -fx-background-color: transparent;
+    -fx-text-fill: #aaa;
+    -fx-background-radius: 20;
+    -fx-border-color: #aaa;
+    -fx-border-radius: 20;
+    -fx-cursor: hand;
+    -fx-padding: 7 24;
+}

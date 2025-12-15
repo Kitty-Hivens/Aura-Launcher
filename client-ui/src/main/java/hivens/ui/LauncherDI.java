@@ -5,8 +5,12 @@ import com.google.gson.GsonBuilder;
 import hivens.core.api.*;
 import hivens.launcher.*;
 import lombok.Getter;
+import okhttp3.Authenticator;
+import okhttp3.Credentials;
 import okhttp3.OkHttpClient;
 
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -32,16 +36,22 @@ public class LauncherDI {
 
     public LauncherDI() {
         String userHome = System.getProperty("user.home");
-        this.dataDirectory = Paths.get(userHome, ".SCOL");
+        this.dataDirectory = Paths.get(userHome, ".aura");
         this.configDirectory = this.dataDirectory;
         this.settingsFilePath = this.configDirectory.resolve("settings.json");
         this.gson = new GsonBuilder().setPrettyPrinting().create();
 
-        this.httpClient = new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .readTimeout(Duration.ofSeconds(30))
-                .build();
+        Authenticator proxyAuthenticator = (route, response) -> {
+            String credential = Credentials.basic("proxyuser", "proxyuserproxyuser");
+            return response.request().newBuilder()
+                    .header("Proxy-Authorization", credential)
+                    .build();
+        };
 
+        this.httpClient = new OkHttpClient.Builder()
+                .proxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("proxy.smartycraft.ru", 1080)))
+                .proxyAuthenticator(proxyAuthenticator)
+                .build();
 
         this.authService = new AuthService(httpClient, gson);
         this.integrityService = new FileIntegrityService();

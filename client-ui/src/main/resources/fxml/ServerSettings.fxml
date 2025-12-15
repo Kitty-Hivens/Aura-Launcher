@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Rectangle?>
+<StackPane fx:id="root" prefHeight="500.0" prefWidth="700.0" styleClass="settings-window" stylesheets="@aura-theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="hivens.ui.ServerSettingsController">
+
+    <Rectangle height="500.0" width="700.0" opacity="0.8" fill="#141e30" arcWidth="30" arcHeight="30"/>
+
+    <VBox spacing="20">
+        <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+
+        <Label fx:id="titleLabel" text="НАСТРОЙКИ: INDUSTRIAL" style="-fx-text-fill: white; -fx-font-size: 24px; -fx-font-weight: bold;"/>
+
+        <TabPane tabClosingPolicy="UNAVAILABLE" styleClass="aura-tabs" VBox.vgrow="ALWAYS">
+
+            <Tab text="СИСТЕМА">
+                <VBox spacing="25" style="-fx-padding: 20;">
+
+                    <VBox spacing="10">
+                        <Label text="Выделенная память (RAM)" styleClass="setting-label"/>
+                        <HBox spacing="15" alignment="CENTER_LEFT">
+                            <Slider fx:id="ramSlider" min="1024" max="8192" blockIncrement="512" HBox.hgrow="ALWAYS"/>
+                            <Label fx:id="ramValueLabel" text="2048 MB" style="-fx-text-fill: #00aaff; -fx-font-weight: bold;"/>
+                        </HBox>
+                    </VBox>
+
+                    <VBox spacing="10">
+                        <Label text="Путь к Java (Оставьте пустым для авто-выбора)" styleClass="setting-label"/>
+                        <HBox spacing="10">
+                            <TextField fx:id="javaPathField" promptText="C:\Program Files\Java\jdk-21..." HBox.hgrow="ALWAYS" styleClass="aura-input"/>
+                            <Button text="📂" styleClass="icon-btn" onAction="#browseJava"/>
+                        </HBox>
+                    </VBox>
+
+                    <VBox spacing="10">
+                        <Label text="Аргументы JVM (Для профи)" styleClass="setting-label"/>
+                        <TextField fx:id="jvmArgsField" promptText="-XX:+UseG1GC" styleClass="aura-input"/>
+                    </VBox>
+
+                </VBox>
+            </Tab>
+
+            <Tab text="МОДЫ">
+                <ScrollPane fitToWidth="true" styleClass="transparent-scroll">
+                    <VBox fx:id="modsContainer" spacing="15" style="-fx-padding: 10;">
+                        <Label text="Загрузка списка модов..." style="-fx-text-fill: gray;"/>
+                    </VBox>
+                </ScrollPane>
+            </Tab>
+
+        </TabPane>
+
+        <HBox alignment="CENTER_RIGHT" spacing="15">
+            <Button text="ОТМЕНА" onAction="#close" styleClass="aura-btn-secondary"/>
+            <Button text="СОХРАНИТЬ" onAction="#save" styleClass="aura-btn-primary"/>
+        </HBox>
+
+    </VBox>
+</StackPane>
