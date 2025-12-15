@@ -56,7 +56,7 @@ public class LauncherService implements ILauncherService {
 
         // Память
         int memory = (profile.getMemoryMb() != null && profile.getMemoryMb() > 0) ? profile.getMemoryMb() : defaultMemoryMB;
-        if (memory < 768) memory = 1024; // Минимум для 1.7+
+        if (memory < 768) memory = 1024;
 
         // Java
         String javaExec;
@@ -78,24 +78,26 @@ public class LauncherService implements ILauncherService {
         List<OptionalMod> allMods = ((ManifestProcessorService) manifestProcessor).getOptionalModsForClient(version);
         syncMods(clientRootPath, profile, allMods);
 
-        // Подготовка файлов
+        // Подготовка файлов (нативы)
         prepareNatives(clientRootPath, config.nativesDir(), version);
         prepareAssets(clientRootPath, "assets-" + version + ".zip");
 
+        // Сборка аргументов JVM
         List<String> jvmArgs = new ArrayList<>();
         jvmArgs.add(javaExec);
 
-        // === JVM Flag Fixes ===
-        if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+        // FIX для macOS
+        if (getPlatform() == OS.MACOS) {
             jvmArgs.add("-XstartOnFirstThread");
+            jvmArgs.add("-Djava.awt.headless=false");
         }
 
-        // SmartyCraft Specific JVM Args
+        // Аргументы SmartyCraft
         jvmArgs.add("-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/");
         jvmArgs.add("-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/");
         jvmArgs.add("-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/");
         jvmArgs.add("-Dminecraft.launcher.brand=smartycraft");
-        jvmArgs.add("-Dlauncher.version=3.0.0"); // Эмуляция версии
+        jvmArgs.add("-Dlauncher.version=3.0.0");
 
         jvmArgs.addAll(config.jvmArgs());
         if (profile.getJvmArgs() != null && !profile.getJvmArgs().isEmpty()) {
@@ -118,9 +120,14 @@ public class LauncherService implements ILauncherService {
             jvmArgs.add(config.tweakClass());
         }
 
+        // Если не сделать inheritIO(), буфер вывода заполнится логами игры,
+        // и процесс игры "зависнет" (перестанет отвечать) во время загрузки.
         ProcessBuilder pb = new ProcessBuilder(jvmArgs);
         pb.directory(clientRootPath.toFile());
-        pb.redirectErrorStream(true);
+
+        // ВАЖНО: inheritIO перенаправляет логи игры в консоль IDEA/Терминала.
+        // Это предотвращает зависание.
+        pb.inheritIO();
 
         log.debug("Launch cmd: {}", String.join(" ", jvmArgs));
 
