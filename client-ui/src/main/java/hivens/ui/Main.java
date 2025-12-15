@@ -5,7 +5,6 @@ import hivens.core.data.InstanceProfile;
 import hivens.core.data.OptionalMod;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
-import hivens.launcher.ManifestProcessorService;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -27,7 +26,8 @@ public class Main extends Application {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
     private LauncherDI container;
     private Stage primaryStage;
-    private SessionData currentSession;
+    private double xOffset = 0;
+    private double yOffset = 0;
 
     @Override
     public void init() {
@@ -37,46 +37,73 @@ public class Main extends Application {
     @Override
     public void start(Stage primaryStage) throws IOException {
         this.primaryStage = primaryStage;
+
+        // Настройка окна для Hyprland/Tiling
         primaryStage.initStyle(StageStyle.TRANSPARENT);
+        primaryStage.setResizable(false);
+        primaryStage.setTitle("Aura Launcher");
+
+        // Важно: не закрывать приложение неявно, если мы скрываем окна
+        // (хотя в нашем случае мы будем проверять настройку)
+        Platform.setImplicitExit(true);
+
         showLoginScene();
     }
 
     public void showLoginScene() throws IOException {
         FXMLLoader loader = loadFXML("LoginForm.fxml");
-        // Фабрика для LoginController
         loader.setControllerFactory(clz -> new LoginController(container, this));
-
-        Parent root = loader.load();
-        Scene scene = new Scene(root);
-        scene.setFill(Color.TRANSPARENT);
-
-        // Применяем тему
-        ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
-
-        primaryStage.setScene(scene);
-        primaryStage.show();
+        showScene(loader);
     }
 
-    public void showAuraMain() {
+    public void showProgressScene(SessionData session, ServerProfile server) throws IOException {
+        FXMLLoader loader = loadFXML("Progress.fxml");
+        SettingsData globalSettings = container.getSettingsService().getSettings();
+
+        UpdateAndLaunchTask task = new UpdateAndLaunchTask(
+                container,
+                session,
+                server,
+                container.getDataDirectory().resolve("clients").resolve(server.getAssetDir()),
+                (globalSettings.getJavaPath() != null) ? Paths.get(globalSettings.getJavaPath()) : null,
+                globalSettings.getMemoryMB()
+        );
+
+        loader.setControllerFactory(clz -> new ProgressController(this, container.getSettingsService()));
+
+        showScene(loader);
+
+        ProgressController controller = loader.getController();
+        Thread thread = new Thread(task);
+        thread.setDaemon(true);
+        controller.startProcess(task, thread);
+    }
+
+    public void showGlobalSettings() {
         try {
-            FXMLLoader loader = loadFXML("AuraMain.fxml");
-            // В AuraMainController нужно добавить конструктор с DI
-            // loader.setControllerFactory(clz -> new AuraMainController(container));
-            // Пока оставим стандартный, если контроллер простой
+            FXMLLoader loader = loadFXML("Settings.fxml");
+            loader.setControllerFactory(c -> new SettingsController(container));
+
+            Stage settingsStage = new Stage();
+            settingsStage.initOwner(primaryStage);
+            settingsStage.initModality(Modality.WINDOW_MODAL);
+            settingsStage.initStyle(StageStyle.TRANSPARENT);
+            settingsStage.setResizable(false);
+            settingsStage.setTitle("Aura Settings");
 
             Parent root = loader.load();
             Scene scene = new Scene(root);
             scene.setFill(Color.TRANSPARENT);
             ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
+            makeDraggable(scene, root);
 
-            primaryStage.setScene(scene);
-            primaryStage.centerOnScreen();
+            settingsStage.setScene(scene);
+            settingsStage.showAndWait();
         } catch (IOException e) {
-            log.error("Failed to show Aura Main", e);
+            log.error("Failed to show global settings", e);
         }
     }
 
-    // --- ОТКРЫТИЕ НАСТРОЕК СЕРВЕРА ---
     public void showServerSettings(ServerProfile server) {
         try {
             FXMLLoader loader = loadFXML("ServerSettings.fxml");
@@ -87,75 +114,61 @@ public class Main extends Application {
             settingsStage.initOwner(primaryStage);
             settingsStage.initModality(Modality.WINDOW_MODAL);
             settingsStage.initStyle(StageStyle.TRANSPARENT);
+            settingsStage.setResizable(false);
 
             Parent root = loader.load();
             Scene scene = new Scene(root);
             scene.setFill(Color.TRANSPARENT);
             ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
+            makeDraggable(scene, root);
+
             settingsStage.setScene(scene);
 
-            // ЗАГРУЗКА ДАННЫХ
             InstanceProfile profile = container.getProfileManager().getProfile(server.getAssetDir());
-
-            // Используем наш новый метод в ManifestProcessorService
             List<OptionalMod> mods = container.getManifestProcessorService()
                     .getOptionalModsForClient(server.getVersion());
 
             controller.setup(profile, container.getProfileManager(), mods, settingsStage);
 
             settingsStage.showAndWait();
-
         } catch (IOException e) {
-            log.error("Failed to open settings", e);
+            log.error("Failed to show server settings", e);
         }
     }
 
-    // --- ЗАПУСК (ПРОГРЕСС) ---
-    public void showProgressScene(SessionData session, ServerProfile server) throws IOException {
-        FXMLLoader loader = loadFXML("Progress.fxml");
-        SettingsData globalSettings = container.getSettingsService().getSettings();
-
-        UpdateAndLaunchTask task = new UpdateAndLaunchTask(
-                container,
-                session,
-                server,
-                container.getDataDirectory().resolve("clients").resolve(server.getAssetDir()),
-                // Если Java нет в глобалках, передаем null, LauncherService сам найдет
-                (globalSettings.getJavaPath() != null) ? Paths.get(globalSettings.getJavaPath()) : null,
-                globalSettings.getMemoryMB()
-        );
-
-        loader.setControllerFactory(clz -> new ProgressController(this));
+    // Вспомогательный метод для загрузки сцены
+    private void showScene(FXMLLoader loader) throws IOException {
         Parent root = loader.load();
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
         ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
-
-        ProgressController controller = loader.getController();
-        Thread thread = new Thread(task);
-        thread.setDaemon(true);
-        controller.startProcess(task, thread);
-
+        makeDraggable(scene, root);
         primaryStage.setScene(scene);
+        if (!primaryStage.isShowing()) {
+            primaryStage.show();
+        }
     }
 
     private FXMLLoader loadFXML(String fxml) {
         return new FXMLLoader(getClass().getResource("/fxml/" + fxml));
     }
 
-    /**
-     * Скрывает главное окно (вызывается при успешном старте игры).
-     */
     public void hideWindow() {
         Platform.runLater(() -> {
-            if (primaryStage != null) {
-                primaryStage.hide();
-            }
+            if (primaryStage != null) primaryStage.hide();
         });
     }
 
-    public void setSession(SessionData session) {
-        this.currentSession = session;
+    private void makeDraggable(Scene scene, Parent root) {
+        scene.setOnMousePressed(event -> {
+            xOffset = event.getSceneX();
+            yOffset = event.getSceneY();
+        });
+        scene.setOnMouseDragged(event -> {
+            if (!primaryStage.isFullScreen()) {
+                primaryStage.setX(event.getScreenX() - xOffset);
+                primaryStage.setY(event.getScreenY() - yOffset);
+            }
+        });
     }
-
 }

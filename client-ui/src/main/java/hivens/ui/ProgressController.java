@@ -1,15 +1,12 @@
 package hivens.ui;
 
+import hivens.core.api.ISettingsService;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Контроллер для Progress.fxml.
- * Отвечает за привязку UI к фоновой задаче UpdateAndLaunchTask.
- */
 public class ProgressController {
 
     private static final Logger log = LoggerFactory.getLogger(ProgressController.class);
@@ -21,53 +18,49 @@ public class ProgressController {
 
     private UpdateAndLaunchTask task;
     private final Main mainApp;
+    private final ISettingsService settingsService;
 
-    // ИСПРАВЛЕНИЕ: Добавлен конструктор, принимающий Main
-    public ProgressController(Main mainApp) {
+    public ProgressController(Main mainApp, ISettingsService settingsService) {
         this.mainApp = mainApp;
+        this.settingsService = settingsService;
     }
 
-    /**
-     * Метод, вызываемый Main для запуска всего процесса.
-     * @param task Сконфигурированная фоновая задача (Оркестратор).
-     * @param taskThread Поток, в котором будет выполняться задача (для прерывания).
-     */
     public void startProcess(UpdateAndLaunchTask task, Thread taskThread) {
         this.task = task;
 
-        // Привязываем UI к свойствам задачи
         description.textProperty().bind(task.messageProperty());
-        master.textProperty().bind(task.titleProperty()); // Используем 'master' для главного статуса
+        master.textProperty().bind(task.titleProperty());
         progressBar.progressProperty().bind(task.progressProperty());
-
-        // (progress (Label) будет обновляться через Platform.runLater из задачи)
 
         task.setOnSucceeded(e -> {
             log.info("UpdateAndLaunchTask Succeeded. Process started.");
             unbindProperties();
-            description.setText("Клиент запущен.");
-            mainApp.hideWindow(); // Скрываем окно
+
+            // Проверка настройки "Закрывать после запуска"
+            boolean shouldClose = settingsService.getSettings().isCloseAfterStart();
+
+            if (shouldClose) {
+                description.setText("Клиент запущен. Закрытие...");
+                mainApp.hideWindow();
+            } else {
+                master.setText("ИГРА ЗАПУЩЕНА");
+                description.setText("Окно лаунчера оставлено открытым.");
+                // Тут можно добавить кнопку "Вернуться в меню", если нужно
+            }
         });
 
         task.setOnFailed(e -> {
             Throwable ex = task.getException();
             log.error("UpdateAndLaunchTask Failed", ex);
-
             unbindProperties();
-
-            master.textProperty().unbind(); // Также отвязываем
-            master.setText("Ошибка!");
-            description.setText("Ошибка: " + ex.getMessage());
-            // TODO: Показать кнопку "Назад"
+            master.textProperty().unbind();
+            master.setText("ОШИБКА ЗАПУСКА");
+            description.setText(ex != null ? ex.getMessage() : "Неизвестная ошибка");
         });
 
-        // Запускаем задачу в потоке, управляемом Main
         taskThread.start();
     }
 
-    /**
-     * Во избежание утечек памяти.
-     */
     private void unbindProperties() {
         description.textProperty().unbind();
         master.textProperty().unbind();

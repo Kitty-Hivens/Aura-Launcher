@@ -1,0 +1,75 @@
+/* === THEME: ICE === */
+
+/* Цвета текста */
+.label-title, .text-field, .password-field, .combo-box, .check-box {
+    -fx-text-fill: #e6f7ff;
+}
+.setting-label {
+    -fx-text-fill: #b3e0ff;
+}
+.label-subtitle {
+    -fx-text-fill: #80c1ff;
+}
+
+/* Акценты */
+.aura-tabs .tab:selected {
+    -fx-text-fill: white;
+    -fx-border-color: transparent transparent #00d2ff transparent;
+}
+
+/* Поля ввода */
+.aura-input, .text-field, .password-field, .combo-box {
+    -fx-background-color: rgba(0, 30, 60, 0.5);
+    -fx-border-color: rgba(0, 210, 255, 0.2);
+    -fx-prompt-text-fill: #6699cc;
+}
+.aura-input:focused, .text-field:focused, .password-field:focused {
+    -fx-border-color: #00d2ff;
+    -fx-background-color: rgba(0, 40, 80, 0.7);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 210, 255, 0.3), 5, 0, 0, 0);
+}
+
+/* Кнопки Primary */
+.aura-btn-primary {
+    -fx-background-color: linear-gradient(to right, #00d2ff, #007bff);
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 210, 255, 0.5), 15, 0, 0, 0);
+}
+.aura-btn-primary:hover {
+    -fx-background-color: linear-gradient(to right, #33dcff, #3395ff);
+}
+.aura-btn-primary:pressed {
+    -fx-background-color: #0056b3;
+    -fx-translate-y: 1;
+}
+
+/* Кнопки Secondary */
+.aura-btn-secondary {
+    -fx-background-color: transparent;
+    -fx-text-fill: #80c1ff;
+    -fx-border-color: #80c1ff;
+    -fx-border-radius: 20;
+}
+.aura-btn-secondary:hover {
+    -fx-text-fill: white;
+    -fx-border-color: #00d2ff;
+    -fx-background-color: rgba(0, 210, 255, 0.1);
+}
+
+/* Слайдеры */
+.slider .track { -fx-background-color: rgba(0, 210, 255, 0.2); }
+.slider .thumb { -fx-background-color: #00d2ff; }
+
+.check-box:selected .box {
+    -fx-background-color: #007bff;
+    -fx-border-color: #00d2ff;
+}
+.check-box .box {
+    -fx-background-color: rgba(0, 20, 40, 0.5);
+    -fx-border-color: rgba(0, 210, 255, 0.3);
+}
+
+.icon-btn:hover {
+    -fx-background-color: rgba(0, 210, 255, 0.2);
+    -fx-border-color: #00d2ff;
+}

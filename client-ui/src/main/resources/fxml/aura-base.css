@@ -1,0 +1,94 @@
+/* === AURA BASE (Structure & Layouts) === */
+
+.root {
+    -fx-font-family: "Open Sans", "Segoe UI", sans-serif;
+}
+
+/* Общие стили для окон */
+.settings-window, .root-pane {
+    -fx-background-color: transparent;
+}
+
+/* --- TABS --- */
+.aura-tabs .tab-header-area .tab-header-background {
+    -fx-background-color: transparent;
+}
+
+.aura-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-text-fill: #888;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-border-color: transparent transparent #444 transparent;
+    -fx-border-width: 0 0 2px 0;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+    -fx-transition: all 0.3s;
+}
+.aura-tabs .tab:hover {
+    -fx-text-fill: #bbb;
+}
+
+.aura-tabs .tab-content-area {
+    -fx-background-color: rgba(0, 0, 0, 0.2);
+    -fx-background-radius: 10;
+    -fx-padding: 0;
+}
+
+/* --- INPUTS --- */
+.aura-input, .text-field, .password-field, .combo-box {
+    -fx-background-radius: 5;
+    -fx-padding: 8 12;
+    -fx-background-insets: 0;
+    -fx-cursor: text;
+}
+.combo-box {
+    -fx-cursor: hand;
+}
+
+/* --- LABELS --- */
+.setting-label {
+    -fx-font-size: 14px;
+}
+.label-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+.label-subtitle {
+    -fx-font-size: 13px;
+}
+
+/* --- BUTTONS --- */
+.aura-btn-primary, .aura-btn-secondary {
+    -fx-background-radius: 20;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-padding: 8 25;
+    -fx-background-insets: 0;
+}
+
+.icon-btn {
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+    -fx-padding: 6 12;
+}
+
+/* --- SCROLLBAR --- */
+.scroll-bar:vertical, .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+}
+.scroll-bar .thumb {
+    -fx-background-radius: 5;
+}
+
+/* --- SLIDER --- */
+.slider .track {
+    -fx-background-radius: 5;
+    -fx-pref-height: 4px;
+}
+.slider .thumb {
+    -fx-background-radius: 10;
+    -fx-pref-width: 14px;
+    -fx-pref-height: 14px;
+    -fx-cursor: hand;
+}

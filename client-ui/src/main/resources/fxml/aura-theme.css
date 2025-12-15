@@ -1,41 +1,70 @@
-/* === AURA THEME (Fixed) === */
+/* === AURA THEME (Cleaned) === */
+
+.root {
+    -fx-font-family: "Open Sans";
+}
 
 /* Окно настроек */
 .settings-window, .root-pane {
     -fx-background-color: transparent;
 }
 
-/* Вкладки */
+/* --- TABS --- */
 .aura-tabs .tab-header-area .tab-header-background {
     -fx-background-color: transparent;
 }
+
 .aura-tabs .tab {
     -fx-background-color: transparent;
     -fx-text-fill: #888;
     -fx-font-size: 14px;
     -fx-font-weight: bold;
     -fx-border-color: transparent transparent #444 transparent;
-    -fx-border-width: 2px;
+    -fx-border-width: 0 0 2px 0;
     -fx-padding: 10 20;
+    -fx-cursor: hand;
 }
+
 .aura-tabs .tab:selected {
     -fx-text-fill: white;
     -fx-border-color: transparent transparent #00aaff transparent;
 }
+
 .aura-tabs .tab-content-area {
     -fx-background-color: rgba(0, 0, 0, 0.3);
     -fx-background-radius: 10;
+    -fx-padding: 0;
 }
 
-/* Поля ввода */
+/* --- INPUTS --- */
 .aura-input, .text-field, .password-field, .combo-box {
-    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-background-color: rgba(0, 0, 0, 0.3);
     -fx-text-fill: white;
+    -fx-prompt-text-fill: #888;
     -fx-background-radius: 5;
-    -fx-border-color: rgba(255,255,255,0.2);
+    -fx-border-color: rgba(255,255,255,0.1);
     -fx-border-radius: 5;
     -fx-padding: 8 12;
 }
+
+.aura-input:focused, .text-field:focused, .password-field:focused {
+    -fx-border-color: #00aaff;
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+}
+
+.combo-box .cell, .combo-box .list-cell {
+    -fx-text-fill: white;
+    -fx-background-color: transparent;
+}
+.combo-box-popup .list-view {
+    -fx-background-color: #1a1a1a;
+    -fx-border-color: #333;
+}
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: #00aaff;
+}
+
+/* --- LABELS --- */
 .setting-label {
     -fx-text-fill: #ccc;
     -fx-font-size: 14px;
@@ -47,24 +76,33 @@
 }
 .label-subtitle {
     -fx-text-fill: #aaa;
-    -fx-font-size: 14px;
+    -fx-font-size: 13px;
 }
-/* Ошибка (для LoginForm) */
 .label-error {
     -fx-text-fill: #ff5e62;
     -fx-font-size: 12px;
+    -fx-font-weight: bold;
 }
 
-/* Кнопки */
-.aura-btn-primary, .btn-accent {
-    -fx-background-color: #00aaff;
+/* --- BUTTONS --- */
+.aura-btn-primary {
+    -fx-background-color: linear-gradient(to right, #00aaff, #0088cc);
     -fx-text-fill: white;
     -fx-background-radius: 20;
     -fx-font-weight: bold;
     -fx-cursor: hand;
     -fx-padding: 8 25;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 170, 255, 0.4), 10, 0, 0, 0);
 }
-.aura-btn-secondary, .btn-secondary {
+.aura-btn-primary:hover {
+    -fx-background-color: linear-gradient(to right, #00bfff, #0099dd);
+}
+.aura-btn-primary:disabled {
+    -fx-opacity: 0.7;
+    -fx-background-color: #555;
+}
+
+.aura-btn-secondary {
     -fx-background-color: transparent;
     -fx-text-fill: #aaa;
     -fx-background-radius: 20;
@@ -73,88 +111,64 @@
     -fx-cursor: hand;
     -fx-padding: 7 24;
 }
+.aura-btn-secondary:hover {
+    -fx-text-fill: white;
+    -fx-border-color: white;
+}
 
-/* Кнопка-иконка (папка) */
+/* --- ICON BUTTON --- */
 .icon-btn {
     -fx-background-color: rgba(255,255,255,0.1);
     -fx-text-fill: white;
     -fx-background-radius: 5;
     -fx-cursor: hand;
-    -fx-padding: 8 12;
-    -fx-border-color: rgba(255,255,255,0.2);
+    -fx-padding: 6 12;
+    -fx-border-color: rgba(255,255,255,0.1);
     -fx-border-radius: 5;
 }
 .icon-btn:hover {
     -fx-background-color: rgba(255,255,255,0.2);
-}
-
-/* Прозрачный скролл (для списка модов) */
-.transparent-scroll {
-    -fx-background-color: transparent;
-    -fx-background: transparent;
-}
-.transparent-scroll > .viewport {
-    -fx-background-color: transparent;
-}
-.scroll-bar {
-    -fx-background-color: transparent;
-}
-.scroll-bar .thumb {
-    -fx-background-color: rgba(255,255,255,0.1);
-    -fx-background-radius: 10;
-}
-
-/* Кнопка-иконка (папка) */
-.icon-btn {
-    -fx-background-color: rgba(255,255,255,0.1);
-    -fx-text-fill: white;
-    -fx-background-radius: 5;
-    -fx-cursor: hand;
-    -fx-padding: 8 12;
-    -fx-border-color: rgba(255,255,255,0.2);
-    -fx-border-radius: 5;
-}
-.icon-btn:hover {
-    -fx-background-color: rgba(255,255,255,0.2);
-}
-
-/* Прозрачный скролл */
-.transparent-scroll {
-    -fx-background-color: transparent;
-    -fx-background: transparent;
-}
-.transparent-scroll > .viewport {
-    -fx-background-color: transparent;
-}
-.scroll-bar {
-    -fx-background-color: transparent;
-}
-.scroll-bar .thumb {
-    -fx-background-color: rgba(255,255,255,0.1);
-    -fx-background-radius: 10;
-}
-
-/* Вкладки */
-.aura-tabs .tab-header-area .tab-header-background {
-    -fx-background-color: transparent;
-}
-.aura-tabs .tab {
-    -fx-background-color: transparent;
-    -fx-text-fill: #888;
-    -fx-font-weight: bold;
-    -fx-border-color: transparent transparent #444 transparent;
-    -fx-border-width: 2px;
-    -fx-padding: 10 20;
-}
-.aura-tabs .tab:selected {
-    -fx-text-fill: white;
-    -fx-border-color: transparent transparent #00aaff transparent;
-}
-/* Чекбокс */
-.aura-checkbox .box {
-    -fx-background-color: rgba(255,255,255,0.1);
     -fx-border-color: rgba(255,255,255,0.3);
 }
-.aura-checkbox:selected .mark {
-    -fx-background-color: white;
+
+/* --- SCROLLBAR --- */
+.transparent-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+.transparent-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+.scroll-bar:vertical, .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+}
+.scroll-bar .thumb {
+    -fx-background-color: rgba(255,255,255,0.2);
+    -fx-background-radius: 5;
+}
+.scroll-bar .thumb:hover {
+    -fx-background-color: rgba(255,255,255,0.4);
+}
+
+/* --- SLIDER --- */
+.slider .track {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 5;
+}
+.slider .thumb {
+    -fx-background-color: #00aaff;
+    -fx-background-radius: 10;
+}
+
+/* --- CHECKBOX --- */
+.check-box .box {
+    -fx-background-color: rgba(0,0,0,0.3);
+    -fx-border-color: rgba(255,255,255,0.2);
+    -fx-border-radius: 3px;
+}
+.check-box:selected .mark {
+    -fx-background-color: #00aaff;
+}
+.check-box:selected .box {
+    -fx-border-color: #00aaff;
 }

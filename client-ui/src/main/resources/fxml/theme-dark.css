@@ -1,0 +1,81 @@
+/* === THEME: DARK === */
+
+/* Цвета текста */
+.label-title, .text-field, .password-field, .combo-box, .check-box {
+    -fx-text-fill: #eeeeee;
+}
+.setting-label {
+    -fx-text-fill: #bbbbbb;
+}
+.label-subtitle {
+    -fx-text-fill: #777777;
+}
+
+/* Акценты */
+.aura-tabs .tab:selected {
+    -fx-text-fill: white;
+    -fx-border-color: transparent transparent #666666 transparent;
+}
+
+/* Поля ввода */
+.aura-input, .text-field, .password-field, .combo-box {
+    -fx-background-color: rgba(20, 20, 20, 0.8);
+    -fx-border-color: #444;
+    -fx-prompt-text-fill: #555;
+}
+.aura-input:focused, .text-field:focused, .password-field:focused {
+    -fx-border-color: #888;
+    -fx-background-color: black;
+}
+
+/* Кнопки Primary */
+.aura-btn-primary {
+    -fx-background-color: #333;
+    -fx-text-fill: #ddd;
+    -fx-border-color: #555;
+    -fx-border-radius: 20;
+}
+.aura-btn-primary:hover {
+    -fx-background-color: #444;
+    -fx-text-fill: white;
+    -fx-border-color: #777;
+}
+.aura-btn-primary:pressed {
+    -fx-background-color: #222;
+    -fx-translate-y: 1;
+}
+
+/* Кнопки Secondary */
+.aura-btn-secondary {
+    -fx-background-color: transparent;
+    -fx-text-fill: #777;
+    -fx-border-color: #444;
+    -fx-border-radius: 20;
+}
+.aura-btn-secondary:hover {
+    -fx-text-fill: #aaa;
+    -fx-border-color: #666;
+}
+
+/* Слайдеры */
+.slider .track { -fx-background-color: #333; }
+.slider .thumb { -fx-background-color: #888; }
+
+.check-box:selected .mark { -fx-background-color: black; }
+.check-box:selected .box {
+    -fx-background-color: #aaa;
+    -fx-border-color: #aaa;
+}
+.check-box .box {
+    -fx-background-color: #222;
+    -fx-border-color: #444;
+}
+
+.icon-btn {
+    -fx-background-color: #222;
+    -fx-border-color: #444;
+}
+.icon-btn:hover {
+    -fx-background-color: #333;
+    -fx-border-color: #666;
+}
