@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.List;
@@ -24,17 +23,10 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-public class FileDownloadService implements IFileDownloadService {
+public record FileDownloadService(OkHttpClient client, Gson gson) implements IFileDownloadService {
 
     private static final Logger logger = LoggerFactory.getLogger(FileDownloadService.class);
-    private final OkHttpClient client;
-    private final Gson gson;
-
-    // Базовый URL
     private static final String DOWNLOAD_BASE_URL = "https://www.smartycraft.ru/launcher/clients/";
-
-    // Глобальная папка обновлений
-    private final Path globalUpdatesDir;
 
     // --- ЧЕРНЫЙ СПИСОК (Опциональные/Конфликтные моды) ---
     private static final List<String> OPTIONAL_MODS_BLACKLIST = List.of(
@@ -45,26 +37,20 @@ public class FileDownloadService implements IFileDownloadService {
             "DiscordRP"
     );
 
-    public FileDownloadService(OkHttpClient client, Gson gson) {
-        this.client = client;
-        this.gson = gson;
-        this.globalUpdatesDir = Paths.get(System.getProperty("user.home"), ".SCOL", "updates");
-    }
-
     /**
      * Точка входа для контроллера.
+     *
+     * @param targetDir Папка, куда нужно сохранить клиент (например ~/.aura/clients/Industrial)
      */
-    public void processSession(SessionData session, String serverId, Consumer<String> progressUI) throws IOException {
-        logger.info("Processing session for server: {}", serverId);
+    public void processSession(SessionData session, String serverId, Path targetDir, Consumer<String> progressUI) throws IOException {
+        logger.info("Processing session for server: {} -> {}", serverId, targetDir);
 
         JsonElement clientJson = gson.toJsonTree(session.fileManifest());
         if (!clientJson.isJsonObject()) {
             throw new IOException("Client data in session is not a JSON object");
         }
 
-        // Папка конкретного сервера
-        Path serverBaseDir = globalUpdatesDir.resolve(serverId);
-        Files.createDirectories(serverBaseDir);
+        Files.createDirectories(targetDir);
 
         // 1. Превращаем дерево JSON в плоскую карту
         Map<String, String> filesToDownload = new HashMap<>();
@@ -73,8 +59,8 @@ public class FileDownloadService implements IFileDownloadService {
         logger.info("Total files found in manifest: {}", filesToDownload.size());
         if (progressUI != null) progressUI.accept("Проверка целостности...");
 
-        // 2. Вызываем метод загрузки (передаем serverId для коррекции путей)
-        int downloaded = downloadMissingFiles(serverBaseDir, serverId, filesToDownload, progressUI);
+        // 2. Вызываем метод загрузки
+        int downloaded = downloadMissingFiles(targetDir, serverId, filesToDownload, progressUI);
 
         logger.info("Download complete. Files downloaded: {}", downloaded);
         if (progressUI != null) progressUI.accept("Готово! Загружено файлов: " + downloaded);
@@ -129,6 +115,7 @@ public class FileDownloadService implements IFileDownloadService {
 
             // --- 1. ЛОГИКА ДЛЯ ЛОКАЛЬНОГО ФАЙЛА (Чинит Industrial) ---
             // Если путь начинается с имени сервера, убираем его, чтобы не было дублей папок
+            // Пример: rawPath="Industrial/mods/mod.jar" -> localRelPath="mods/mod.jar"
             String localRelPath = rawPath;
             if (localRelPath.startsWith(serverId + "/")) {
                 localRelPath = localRelPath.substring(serverId.length() + 1);
@@ -191,7 +178,6 @@ public class FileDownloadService implements IFileDownloadService {
     // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ---
 
     private String relPathForLog(String path) {
-        // Укорачиваем длинные пути для UI
         if (path.length() > 30) {
             return "..." + path.substring(path.length() - 30);
         }
@@ -227,6 +213,12 @@ public class FileDownloadService implements IFileDownloadService {
         if (!Files.exists(file)) return true;
         if (Files.isDirectory(file)) return true;
         if ("any".equalsIgnoreCase(expectedMd5) || expectedMd5 == null) return false;
+        // Если файл пустой, тоже качаем заново
+        try {
+            if (Files.size(file) == 0) return true;
+        } catch (IOException e) {
+            return true;
+        }
 
         try {
             String localMd5 = getFileChecksum(file);

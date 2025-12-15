@@ -31,7 +31,7 @@ public class UpdateAndLaunchTask extends Task<Process> {
             LauncherDI di,
             SessionData sessionData,
             ServerProfile serverProfile,
-            Path clientRoot, // Это папка ~/.SCOL/updates/Industrial
+            Path clientRoot,
             Path javaPath,
             int memory
     ) {
@@ -48,13 +48,16 @@ public class UpdateAndLaunchTask extends Task<Process> {
     protected Process call() throws Exception {
         // --- Шаг 1: Скачивание и Проверка ---
         updateTitle("Обновление клиента...");
-        updateProgress(-1, 100); // Неопределенный прогресс пока анализируем
+        updateProgress(-1, 100);
 
-        // Мы используем конкретную реализацию FileDownloadService,
-        // так как метод processSession специфичен для этого лаунчера и не входит в общий интерфейс.
+        // [FIX] Явно передаем путь назначения и ID папки (AssetDir)
         if (downloadService instanceof FileDownloadService concreteService) {
-            // Передаем callback (msg -> updateMessage(msg)) для обновления текста в UI
-            concreteService.processSession(sessionData, serverProfile.getName(), this::updateMessage);
+            concreteService.processSession(
+                    sessionData,
+                    serverProfile.getAssetDir(), // Используем ID папки (Industrial)
+                    clientRootPath,              // Куда качать (~/.aura/clients/Industrial)
+                    this::updateMessage
+            );
         } else {
             log.warn("DownloadService is not an instance of hivens.launcher.FileDownloadService! Skipping download logic.");
         }
