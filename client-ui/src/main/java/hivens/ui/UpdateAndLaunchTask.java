@@ -48,15 +48,16 @@ public class UpdateAndLaunchTask extends Task<Process> {
     protected Process call() throws Exception {
         // --- Шаг 1: Скачивание и Проверка ---
         updateTitle("Обновление клиента...");
-        updateProgress(-1, 100);
+        updateProgress(0, 100); // Сбрасываем прогресс в 0
 
-        // [FIX] Явно передаем путь назначения и ID папки (AssetDir)
         if (downloadService instanceof FileDownloadService concreteService) {
+            // [FIX] Передаем путь и ДВА колбэка: для текста и для прогресса
             concreteService.processSession(
                     sessionData,
-                    serverProfile.getAssetDir(), // Используем ID папки (Industrial)
-                    clientRootPath,              // Куда качать (~/.aura/clients/Industrial)
-                    this::updateMessage
+                    serverProfile.getAssetDir(),
+                    clientRootPath,
+                    this::updateMessage,  // Обновление текста (Label)
+                    this::updateProgress  // Обновление цифр (ProgressBar)
             );
         } else {
             log.warn("DownloadService is not an instance of hivens.launcher.FileDownloadService! Skipping download logic.");

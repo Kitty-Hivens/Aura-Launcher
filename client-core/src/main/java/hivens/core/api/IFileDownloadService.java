@@ -3,6 +3,7 @@ package hivens.core.api;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -23,12 +24,8 @@ public interface IFileDownloadService {
     /**
      * Загружает все файлы из предоставленной карты (обычно из IFileIntegrityService).
      * Реализация должна обеспечивать создание всех необходимых директорий.
-     *
-     * @param basePath Корневая директория клиента (например, /home/user/.smarty).
-     * @param filesToDownload Карта (относительный путь -> хэш) файлов для загрузки.
-     * @param progressConsumer (Опционально) Callback для отслеживания прогресса (например, обновление UI).
      * @return Количество успешно загруженных файлов.
      * @throws IOException в случае, если один из файлов не удалось загрузить (может быть заменено на сбор ошибок).
      */
-    int downloadMissingFiles(Path basePath, String serverId, Map<String, String> filesToDownload, Consumer<String> progressConsumer) throws IOException;
+    int downloadMissingFiles(Path basePath, String serverId, Map<String, String> filesToDownload, Consumer<String> messageUI, BiConsumer<Integer, Integer> progressUI) throws IOException;
 }

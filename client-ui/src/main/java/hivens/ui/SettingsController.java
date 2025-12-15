@@ -13,14 +13,17 @@ public class SettingsController {
 
     private final LauncherDI di;
     private final SettingsData settings;
+    private final Main mainApp;
 
     @FXML private TextField javaPathField;
     @FXML private TextField memoryField;
     @FXML private CheckBox closeAfterStart;
     @FXML private ComboBox<String> themeSelector;
 
-    public SettingsController(LauncherDI di) {
+    // [FIX] Теперь принимаем Main
+    public SettingsController(LauncherDI di, Main mainApp) {
         this.di = di;
+        this.mainApp = mainApp;
         this.settings = di.getSettingsService().getSettings();
     }
 
@@ -33,6 +36,25 @@ public class SettingsController {
         if (themeSelector != null) {
             themeSelector.getItems().addAll("Warm", "Ice", "Dark");
             themeSelector.setValue(settings.getTheme());
+
+            // [FIX] ЖИВОЙ ПРЕДПРОСМОТР (LIVE PREVIEW)
+            themeSelector.valueProperty().addListener((obs, oldVal, newVal) -> {
+                if (newVal != null) {
+                    // Создаем временный объект настроек для предпросмотра
+                    SettingsData preview = new SettingsData();
+                    preview.setTheme(newVal);
+
+                    // 1. Применяем к окну настроек
+                    if (javaPathField.getScene() != null) {
+                        ThemeManager.applyTheme(javaPathField.getScene(), preview);
+                    }
+
+                    // 2. Применяем к ГЛАВНОМУ окну
+                    if (mainApp.getPrimaryStage() != null && mainApp.getPrimaryStage().getScene() != null) {
+                        ThemeManager.applyTheme(mainApp.getPrimaryStage().getScene(), preview);
+                    }
+                }
+            });
         }
     }
 
@@ -45,7 +67,10 @@ public class SettingsController {
             settings.setMemoryMB(4096);
         }
         settings.setCloseAfterStart(closeAfterStart.isSelected());
-        if (themeSelector != null) settings.setTheme(themeSelector.getValue());
+
+        if (themeSelector != null) {
+            settings.setTheme(themeSelector.getValue());
+        }
 
         di.getSettingsService().saveSettings(settings);
         onClose();
@@ -60,7 +85,6 @@ public class SettingsController {
 
     @FXML
     private void onClose() {
-        // Получаем Stage через любой элемент сцены
         Stage stage = (Stage) javaPathField.getScene().getWindow();
         stage.close();
     }

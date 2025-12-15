@@ -11,7 +11,7 @@ public class ThemeManager {
 
         scene.getStylesheets().clear();
 
-        // 1. Выбираем файл цветов
+        // 1. Выбираем файл цветовой схемы
         String themeName = (settings.getTheme() != null) ? settings.getTheme() : "Warm";
         String cssFile = switch (themeName) {
             case "Ice" -> "theme-ice.css";
@@ -19,14 +19,11 @@ public class ThemeManager {
             default -> "theme-warm.css";
         };
 
-        // 2. Подключаем цвета
+        // 2. Подключаем цветовую схему
         addCss(scene, cssFile);
 
-        // 3. Подключаем базовую структуру (шрифты, отступы)
+        // 3. Подключаем базовую геометрию (шрифты, отступы)
         addCss(scene, "aura-base.css");
-        
-        // 4. Подключаем специфичные стили контролов (если они не в aura-base)
-        addCss(scene, "aura-theme.css"); 
     }
 
     private static void addCss(Scene scene, String name) {

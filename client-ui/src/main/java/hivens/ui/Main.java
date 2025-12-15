@@ -38,16 +38,18 @@ public class Main extends Application {
     public void start(Stage primaryStage) throws IOException {
         this.primaryStage = primaryStage;
 
-        // Настройка окна для Hyprland/Tiling
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setResizable(false);
         primaryStage.setTitle("Aura Launcher");
 
-        // Важно: не закрывать приложение неявно, если мы скрываем окна
-        // (хотя в нашем случае мы будем проверять настройку)
         Platform.setImplicitExit(true);
 
         showLoginScene();
+    }
+
+    // [NEW] Геттер для доступа к главному окну из контроллеров
+    public Stage getPrimaryStage() {
+        return primaryStage;
     }
 
     public void showLoginScene() throws IOException {
@@ -70,7 +72,6 @@ public class Main extends Application {
         );
 
         loader.setControllerFactory(clz -> new ProgressController(this, container.getSettingsService()));
-
         showScene(loader);
 
         ProgressController controller = loader.getController();
@@ -82,7 +83,8 @@ public class Main extends Application {
     public void showGlobalSettings() {
         try {
             FXMLLoader loader = loadFXML("Settings.fxml");
-            loader.setControllerFactory(c -> new SettingsController(container));
+            // [FIX] Передаем 'this' (Main), чтобы контроллер мог менять тему главного окна
+            loader.setControllerFactory(c -> new SettingsController(container, this));
 
             Stage settingsStage = new Stage();
             settingsStage.initOwner(primaryStage);
@@ -99,6 +101,10 @@ public class Main extends Application {
 
             settingsStage.setScene(scene);
             settingsStage.showAndWait();
+
+            // Обновляем тему главного окна после закрытия (на случай отмены или сохранения)
+            ThemeManager.applyTheme(primaryStage.getScene(), container.getSettingsService().getSettings());
+
         } catch (IOException e) {
             log.error("Failed to show global settings", e);
         }
@@ -136,7 +142,6 @@ public class Main extends Application {
         }
     }
 
-    // Вспомогательный метод для загрузки сцены
     private void showScene(FXMLLoader loader) throws IOException {
         Parent root = loader.load();
         Scene scene = new Scene(root);
