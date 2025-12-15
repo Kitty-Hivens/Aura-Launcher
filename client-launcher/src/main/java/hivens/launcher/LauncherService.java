@@ -62,30 +62,16 @@ public class LauncherService implements ILauncherService {
             throw new IOException("No launch configuration found for version: " + version);
         }
 
-        // --- ЭТАП 0: ЗАЧИСТКА ВРАГОВ (ReplayMod и т.д.) ---
-        deleteBannedMods(clientRootPath);
+        //deleteBannedMods(clientRootPath);
 
-        // --- ЭТАП 1: Подготовка нативов ---
         prepareNatives(clientRootPath, config.nativesDir(), version);
-
-        // --- ЭТАП 1.5: Подготовка Ассетов (НОВОЕ: Фикс звуков) ---
         prepareAssets(clientRootPath, "assets-" + version + ".zip");
-
-        // --- ЭТАП 2: Выбор Java (Форсируем Java 8 для 1.12.2) ---
-        String actualJavaPath;
-        if ("1.12.2".equals(version)) {
-            log.warn("FORCE OVERRIDE: Using Java 8 for 1.12.2 -> {}", FORCED_JAVA_8_PATH);
-            actualJavaPath = FORCED_JAVA_8_PATH;
-        } else {
-            actualJavaPath = javaExecutablePath.toString();
-        }
-
+        String actualJavaPath = javaExecutablePath.toString();
         List<String> jvmArgs = new ArrayList<>();
         jvmArgs.add(actualJavaPath);
 
         // --- ЭТАП 3: Аргументы JVM ---
         if ("1.12.2".equals(version)) {
-            // Аргументы G1GC для 1.12.2
             jvmArgs.add("-XX:+UseG1GC");
             jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
             jvmArgs.add("-XX:G1NewSizePercent=20");
@@ -93,42 +79,27 @@ public class LauncherService implements ILauncherService {
             jvmArgs.add("-XX:MaxGCPauseMillis=50");
             jvmArgs.add("-XX:G1HeapRegionSize=32M");
             jvmArgs.add("-Djava.net.preferIPv4Stack=true");
-            // Forge флаги
             jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
             jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
             jvmArgs.add("-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/");
             jvmArgs.add("-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/");
             jvmArgs.add("-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/");
         } else if("1.7.10".equals(version)) {
-            // Аргументы для 1.7.10
             jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
             jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
             jvmArgs.add("-XX:+UseG1GC");
-            // ... остальные флаги GC, если нужны ...
         }
 
-        // Добавляем флаги из конфига (там лежат брендовые флаги SmartyCraft!)
         jvmArgs.addAll(config.jvmArgs());
-
-        // Память
         jvmArgs.add("-Xms512M");
         jvmArgs.add("-Xmx" + allocatedMemoryMB + "M");
-
-        // Путь к нативам
         Path nativesPath = clientRootPath.resolve(config.nativesDir());
         jvmArgs.add("-Djava.library.path=" + nativesPath.toAbsolutePath());
-
-        // Classpath
         jvmArgs.add("-cp");
         jvmArgs.add(buildClasspath(clientRootPath, sessionData.fileManifest()));
-
-        // Main Class
         jvmArgs.add(config.mainClass());
-
-        // --- ЭТАП 4: Аргументы Minecraft (С ФИКСОМ BAD SESSION) ---
         jvmArgs.addAll(buildMinecraftArgs(sessionData, serverProfile, clientRootPath, config.assetIndex()));
 
-        // TweakClass
         if (config.tweakClass() != null) {
             jvmArgs.add("--tweakClass");
             jvmArgs.add(config.tweakClass());
@@ -144,24 +115,19 @@ public class LauncherService implements ILauncherService {
 
         Process process = pb.start();
 
-        // Читаем вывод процесса (GameOutputReader)
         new Thread(() -> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     System.out.println("[GAME] " + line);
                 }
-            } catch (IOException e) {
-                // Игнорируем
-            }
+            } catch (IOException ignored) {}
         }, "GameOutputReader").start();
 
         return process;
     }
 
     private List<String> buildMinecraftArgs(SessionData sessionData, ServerProfile serverProfile, Path clientRootPath, String assetIndex) {
-
-        // ВАЖНО: UUID берется из SessionData (где он уже очищен от дефисов)
 
         List<String> args = new ArrayList<>();
         args.add("--username");
@@ -181,15 +147,10 @@ public class LauncherService implements ILauncherService {
         args.add("--userProperties");
         args.add("{}");
 
-        // --- ВОЗВРАЩЕНЫЕ ФЛАГИ ИЗ ОРИГИНАЛА ---
         args.add("--userType");
-        args.add("mojang"); // <-- ВОЗВРАЩЕН: Оригинал его использует
+        args.add("mojang");
         args.add("--versionType");
-        args.add("Forge"); // <-- ВОЗВРАЩЕН
-
-        // Если ты хочешь вернуть размеры окна, тоже добавь (по умолчанию 854x480)
-        // args.add("--width"); args.add("854");
-        // args.add("--height"); args.add("480");
+        args.add("Forge");
 
         return args;
     }
@@ -276,6 +237,7 @@ public class LauncherService implements ILauncherService {
         }
     }
 
+    @Deprecated
     private void deleteBannedMods(Path root) {
         log.info("Scanning for banned mods...", root);
         try (Stream<Path> walk = Files.walk(root)) {

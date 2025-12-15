@@ -17,45 +17,32 @@ import java.time.Duration;
 @Getter
 public class LauncherDI {
 
-    // --- Пути Приложения ---
-    /** (e.g., /home/haru/.config/SCOL) */
     private final Path configDirectory;
-    /** (e.g., /home/haru/.local/share/SCOL) */
-    private final Path dataDirectory; // (Будет использоваться для clientRootPath)
-    /** (e.g., .../SCOL/settings.json) */
+    private final Path dataDirectory;
     private final Path settingsFilePath;
-
-    // --- Синглтоны ---
     private final OkHttpClient httpClient;
     private final Gson gson;
-
-    // --- Сервисы ---
     private final IAuthService authService;
     private final IFileIntegrityService integrityService;
     private final IFileDownloadService downloadService;
     private final IManifestProcessorService manifestProcessorService;
     private final ILauncherService launcherService;
     private final IServerListService serverListService;
-    private final ISettingsService settingsService; // (Добавлено)
+    private final ISettingsService settingsService;
 
     public LauncherDI() {
-        // 1. Определение путей (Кроссплатформенно)
         String userHome = System.getProperty("user.home");
-        // (Используем .SCOL в домашней директории для простоты)
         this.dataDirectory = Paths.get(userHome, ".SCOL");
-        this.configDirectory = this.dataDirectory; // (Или .config/SCOL)
+        this.configDirectory = this.dataDirectory;
         this.settingsFilePath = this.configDirectory.resolve("settings.json");
+        this.gson = new GsonBuilder().setPrettyPrinting().create();
 
-        // 2. Инициализация базовых зависимостей
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(30))
                 .build();
 
-        // (Включаем prettyPrinting для читаемого settings.json)
-        this.gson = new GsonBuilder().setPrettyPrinting().create();
 
-        // 3. Инициализация сервисов
         this.authService = new AuthService(httpClient, gson);
         this.integrityService = new FileIntegrityService();
         this.downloadService = new FileDownloadService(httpClient, gson);

@@ -23,20 +23,23 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 
-public class AuthService implements IAuthService {
+public record AuthService(OkHttpClient client, Gson gson) implements IAuthService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
-    private final OkHttpClient client;
-    private final Gson gson;
 
-    // Внутренний класс для парсинга ответа (нам нужен uid, которого нет в SessionData)
     private static class AuthResponse {
-        @SerializedName("status") AuthStatus status;
-        @SerializedName("playername") String playername;
-        @SerializedName("uid") String uid;       // <--- Критически важно для генерации токена
-        @SerializedName("uuid") String uuid;
-        @SerializedName("session") String session; // <--- Это зашифрованный V3 токен
-        @SerializedName("client") FileManifest client;
+        @SerializedName("status")
+        AuthStatus status;
+        @SerializedName("playername")
+        String playername;
+        @SerializedName("uid")
+        String uid;       // <--- Критически важно для генерации токена
+        @SerializedName("uuid")
+        String uuid;
+        @SerializedName("session")
+        String session; // <--- Это зашифрованный V3 токен
+        @SerializedName("client")
+        FileManifest client;
     }
 
     public AuthService(OkHttpClient client, Gson gson) {
@@ -80,6 +83,7 @@ public class AuthService implements IAuthService {
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) throw new AuthException(AuthStatus.INTERNAL_ERROR, "HTTP " + response.code());
 
+            assert response.body() != null;
             String rawResponse = response.body().string();
             // Чистка JSON
             int start = rawResponse.indexOf("{");
@@ -93,10 +97,8 @@ public class AuthService implements IAuthService {
                     throw new AuthException(authResp.status, "API Error: " + authResp.status);
                 }
 
-                // === МАГИЯ РАСШИФРОВКИ ТОКЕНА ===
-                // Берем зашифрованный токен (session) и UID, и превращаем в игровой токен
                 String finalGameToken = generateGameToken(authResp.uid, authResp.session);
-                logger.info("Generated Game Token: " + finalGameToken);
+                logger.info("Generated Game Token: {}", finalGameToken);
 
                 String uuid = authResp.uuid;
                 if (uuid != null) uuid = uuid.replace("-", "");
@@ -105,7 +107,7 @@ public class AuthService implements IAuthService {
                         authResp.status,
                         authResp.playername,
                         uuid,
-                        finalGameToken, // <-- ОТДАЕМ РАСШИФРОВАННЫЙ ТОКЕН
+                        finalGameToken,
                         authResp.client
                 );
 
@@ -115,30 +117,20 @@ public class AuthService implements IAuthService {
         }
     }
 
-    // Алгоритм из ru.smartycraft.h.c()
     private String generateGameToken(String uid, String sessionV3) {
         try {
             if (sessionV3 == null || uid == null) return sessionV3;
 
-            // 1. Генерируем ключ: MD5(uid + соль).substring(0, 16)
             String salt = "sdgsdfhgosd8dfrg";
             String keyHash = getMD5(uid + salt);
             String key = keyHash.substring(0, 16);
-
-            // 2. Расшифровываем токен (AES)
             String decrypted = decryptAES(sessionV3, key);
-
-            // 3. Хешируем результат (MD5)
             String hash1 = getMD5(decrypted);
-
-            // 4. Финальный хеш: MD5(hash1 + hash1.substring(length-3))
-            // Это логика из ce.a(var, 3)
             String suffix = hash1.length() >= 3 ? hash1.substring(hash1.length() - 3) : "";
             return getMD5(hash1 + suffix);
 
         } catch (Exception e) {
             logger.error("Failed to generate game token", e);
-            // Если расшифровка не удалась, возвращаем оригинал (на всякий случай)
             return sessionV3;
         }
     }
@@ -159,14 +151,16 @@ public class AuthService implements IAuthService {
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) sb.append(String.format("%02x", b));
             return sb.toString();
-        } catch (Exception e) { return ""; }
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private String generateRandomMac() {
         Random rand = new Random();
         byte[] mac = new byte[6];
         rand.nextBytes(mac);
-        mac[0] = (byte)(mac[0] & (byte)254);
+        mac[0] = (byte) (mac[0] & (byte) 254);
         StringBuilder sb = new StringBuilder(18);
         for (byte b : mac) {
             if (!sb.isEmpty()) sb.append("-");
@@ -174,4 +168,11 @@ public class AuthService implements IAuthService {
         }
         return sb.toString();
     }
+
+    public static Authenticator proxyAuthenticator = (route, response) -> {
+        String credential = Credentials.basic("proxyuser", "proxyuserproxyuser");
+        return response.request().newBuilder()
+                .header("Proxy-Authorization", credential)
+                .build();
+    };
 }
