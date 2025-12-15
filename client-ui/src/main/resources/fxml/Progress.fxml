@@ -1,23 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
-<?import javafx.scene.image.Image?>
-<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Rectangle?>
 
-<VBox alignment="CENTER" maxHeight="450.0" maxWidth="450.0" spacing="15.0" styleClass="root-pane"
-      stylesheets="@style.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="hivens.ui.ProgressController">
-    <padding>
-        <Insets bottom="40.0" left="40.0" right="40.0" top="40.0"/>
-    </padding>
-    <ImageView fitHeight="80.0" pickOnBounds="true" preserveRatio="true" VBox.vgrow="ALWAYS">
-        <Image url="@/images/favicon.png"/>
-    </ImageView>
-    <Label fx:id="master" styleClass="label-title" text="Подготовка..."/>
-    <Label fx:id="description" styleClass="label-subtitle" text="Проверка файлов..."/>
-    <ProgressBar fx:id="progressBar" maxWidth="Infinity" prefHeight="10.0" progress="0.0" styleClass="progress-bar"/>
-    <Label fx:id="progress" styleClass="label-subtitle" text="0%"/>
-</VBox>
+<StackPane fx:id="root" prefHeight="250.0" prefWidth="450.0" styleClass="root-pane" stylesheets="@aura-theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="hivens.ui.ProgressController">
+
+    <Rectangle height="250.0" width="450.0" arcWidth="20" arcHeight="20" style="-fx-fill: -fx-panel-bg;" opacity="0.95"/>
+
+    <VBox alignment="CENTER" spacing="20" style="-fx-padding: 30;">
+
+        <Label text="ЗАПУСК ИГРЫ" styleClass="label-title" style="-fx-font-size: 20px;"/>
+
+        <Label fx:id="statusLabel" text="Инициализация..." styleClass="label-subtitle" wrapText="true" textAlignment="CENTER"/>
+
+        <VBox spacing="5" alignment="CENTER">
+            <ProgressBar fx:id="progressBar" prefWidth="380.0" progress="0.0" style="-fx-accent: -fx-accent-color;"/>
+        </VBox>
+
+    </VBox>
+</StackPane>

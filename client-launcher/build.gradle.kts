@@ -11,5 +11,7 @@ dependencies {
     // JSON-маппинг
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // TODO: JFX
+    implementation("org.apache.commons:commons-lang3:3.14.0")
+    implementation("org.apache.commons:commons-compress:1.26.1")
+    implementation("commons-io:commons-io:2.15.1")
 }

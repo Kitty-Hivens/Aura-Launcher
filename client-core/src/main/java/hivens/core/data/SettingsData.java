@@ -1,30 +1,40 @@
 package hivens.core.data;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.io.File;
 
 /**
- * Модель данных (DTO) для хранения настроек лаунчера.
- * (Будет сериализован в .json файл).
+ * Глобальные настройки лаунчера.
+ * (Используем Class вместо Record, чтобы можно было менять поля через сеттеры в UI)
  */
-public record SettingsData(
-    
-    /** Путь к исполняемому файлу Java (e.g., /usr/bin/java). */
-    String javaPath,
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class SettingsData {
 
-    /** Выделенная память в МБ (e.g., 4096). */
-    int memoryMB,
+    // --- Система ---
+    private String javaPath;         // Путь к Java
+    private int memoryMB = 4096;     // Память (по умолчанию 4GB)
 
-    /** (Для Issue #11) Путь к кастомному CSS-файлу темы (может быть null). */
-    String customThemePath
-) {
+    // --- Визуал ---
+    private String theme = "Warm";   // Тема: "Ice", "Warm", "Dark"
+
+    // --- Поведение ---
+    private boolean closeAfterStart = true;
+    private boolean saveCredentials = true;
+
     /**
-     * Предоставляет настройки по умолчанию.
+     * Создает дефолтные настройки
      */
     public static SettingsData defaults() {
-        return new SettingsData(
-            System.getProperty("java.home") + File.separator + "bin" + File.separator + "java", // Попытка авто-определения
-            4096, // 4GB по умолчанию
-            null
-        );
+        SettingsData data = new SettingsData();
+        // Пытаемся угадать системную Java
+        data.setJavaPath(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
+        data.setMemoryMB(4096);
+        data.setTheme("Warm");
+        return data;
     }
 }

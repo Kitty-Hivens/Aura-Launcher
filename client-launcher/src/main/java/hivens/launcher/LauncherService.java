@@ -4,6 +4,8 @@ import hivens.core.api.ILauncherService;
 import hivens.core.api.IManifestProcessorService;
 import hivens.core.data.FileManifest;
 import hivens.core.api.model.ServerProfile;
+import hivens.core.data.InstanceProfile;
+import hivens.core.data.OptionalMod;
 import hivens.core.data.SessionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +30,8 @@ public class LauncherService implements ILauncherService {
 
     private final IManifestProcessorService manifestProcessor;
     private final Map<String, LaunchConfig> launchConfigs;
+    private final ProfileManager profileManager;
+    private final JavaManagerService javaManager;
 
     private record LaunchConfig(
             String mainClass,
@@ -37,8 +41,10 @@ public class LauncherService implements ILauncherService {
             String nativesDir
     ) {}
 
-    public LauncherService(IManifestProcessorService manifestProcessor) {
-        this.manifestProcessor = Objects.requireNonNull(manifestProcessor, "ManifestProcessorService cannot be null");
+    public LauncherService(IManifestProcessorService manifestProcessor, ProfileManager profileManager, JavaManagerService javaManager) {
+        this.manifestProcessor = manifestProcessor;
+        this.profileManager = profileManager;
+        this.javaManager = javaManager;
         this.launchConfigs = buildLaunchConfigMap();
     }
 
@@ -47,30 +53,47 @@ public class LauncherService implements ILauncherService {
             SessionData sessionData,
             ServerProfile serverProfile,
             Path clientRootPath,
-            Path javaExecutablePath,
-            int allocatedMemoryMB
+            Path defaultJavaPath,   // (Может быть null, если в глобалках не задано)
+            int defaultMemoryMB
     ) throws IOException {
 
-        Objects.requireNonNull(sessionData, "SessionData cannot be null");
-        Objects.requireNonNull(serverProfile, "ServerProfile cannot be null");
+        // 1. ЗАГРУЖАЕМ ПРОФИЛЬ (assetDir = "Industrial")
+        InstanceProfile profile = profileManager.getProfile(serverProfile.getAssetDir());
+
+        // 2. ОПРЕДЕЛЯЕМ ПАМЯТЬ
+        int memory = (profile.getMemoryMb() != null && profile.getMemoryMb() > 0) ? profile.getMemoryMb() : defaultMemoryMB;
+        if (memory < 512) memory = 4096; // Защита от дурака
+
+        // 3. ОПРЕДЕЛЯЕМ JAVA (Приоритет: Профиль -> Глобалки -> Авто-скачивание)
+        String javaExec;
+        if (profile.getJavaPath() != null && !profile.getJavaPath().isEmpty()) {
+            javaExec = profile.getJavaPath();
+        } else if (defaultJavaPath != null && Files.exists(defaultJavaPath)) {
+            javaExec = defaultJavaPath.toString();
+        } else {
+            // Если ничего не задано, просим JavaManager найти или скачать
+            javaExec = javaManager.getJavaPath(serverProfile.getVersion()).toString();
+        }
+
+        log.info("Launch Config: Java={}, RAM={}MB, Server={}", javaExec, memory, serverProfile.getName());
 
         String version = serverProfile.getVersion();
         LaunchConfig config = launchConfigs.get(version);
+        if (config == null) throw new IOException("Config not found for version: " + version);
 
-        if (config == null) {
-            log.error("Missing hardcoded LaunchConfig for version: {}. Aborting.", version);
-            throw new IOException("No launch configuration found for version: " + version);
-        }
+        // 4. СИНХРОНИЗАЦИЯ МОДОВ (ХИРУРГ)
+        List<OptionalMod> allMods = ((ManifestProcessorService) manifestProcessor).getOptionalModsForClient(version);
+        syncMods(clientRootPath, profile, allMods);
 
-        //deleteBannedMods(clientRootPath);
-
+        // 5. ПОДГОТОВКА ФАЙЛОВ
         prepareNatives(clientRootPath, config.nativesDir(), version);
         prepareAssets(clientRootPath, "assets-" + version + ".zip");
-        String actualJavaPath = javaExecutablePath.toString();
-        List<String> jvmArgs = new ArrayList<>();
-        jvmArgs.add(actualJavaPath);
 
-        // --- ЭТАП 3: Аргументы JVM ---
+        // 6. СБОРКА КОМАНДЫ
+        List<String> jvmArgs = new ArrayList<>();
+        jvmArgs.add(javaExec);
+
+        // Флаги версии
         if ("1.12.2".equals(version)) {
             jvmArgs.add("-XX:+UseG1GC");
             jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
@@ -78,26 +101,28 @@ public class LauncherService implements ILauncherService {
             jvmArgs.add("-XX:G1ReservePercent=20");
             jvmArgs.add("-XX:MaxGCPauseMillis=50");
             jvmArgs.add("-XX:G1HeapRegionSize=32M");
-            jvmArgs.add("-Djava.net.preferIPv4Stack=true");
-            jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
-            jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
+            // Smarty Auth Fixes
             jvmArgs.add("-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/");
             jvmArgs.add("-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/");
             jvmArgs.add("-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/");
-        } else if("1.7.10".equals(version)) {
-            jvmArgs.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
-            jvmArgs.add("-Dfml.ignorePatchDiscrepancies=true");
+        } else if ("1.7.10".equals(version)) {
             jvmArgs.add("-XX:+UseG1GC");
         }
 
         jvmArgs.addAll(config.jvmArgs());
+        if (profile.getJvmArgs() != null && !profile.getJvmArgs().isEmpty()) {
+            jvmArgs.addAll(List.of(profile.getJvmArgs().split(" ")));
+        }
+
         jvmArgs.add("-Xms512M");
-        jvmArgs.add("-Xmx" + allocatedMemoryMB + "M");
+        jvmArgs.add("-Xmx" + memory + "M");
+
         Path nativesPath = clientRootPath.resolve(config.nativesDir());
         jvmArgs.add("-Djava.library.path=" + nativesPath.toAbsolutePath());
         jvmArgs.add("-cp");
         jvmArgs.add(buildClasspath(clientRootPath, sessionData.fileManifest()));
         jvmArgs.add(config.mainClass());
+
         jvmArgs.addAll(buildMinecraftArgs(sessionData, serverProfile, clientRootPath, config.assetIndex()));
 
         if (config.tweakClass() != null) {
@@ -105,26 +130,11 @@ public class LauncherService implements ILauncherService {
             jvmArgs.add(config.tweakClass());
         }
 
-        log.debug("Assembled launch command: {}", String.join(" ", jvmArgs));
-
         ProcessBuilder pb = new ProcessBuilder(jvmArgs);
         pb.directory(clientRootPath.toFile());
         pb.redirectErrorStream(true);
 
-        log.info("Launching client process for user {} (Version: {})...", sessionData.playerName(), version);
-
-        Process process = pb.start();
-
-        new Thread(() -> {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.out.println("[GAME] " + line);
-                }
-            } catch (IOException ignored) {}
-        }, "GameOutputReader").start();
-
-        return process;
+        return pb.start();
     }
 
     private List<String> buildMinecraftArgs(SessionData sessionData, ServerProfile serverProfile, Path clientRootPath, String assetIndex) {
@@ -237,19 +247,35 @@ public class LauncherService implements ILauncherService {
         }
     }
 
-    @Deprecated
-    private void deleteBannedMods(Path root) {
-        log.info("Scanning for banned mods...", root);
-        try (Stream<Path> walk = Files.walk(root)) {
-            walk.filter(p -> p.toString().contains("ReplayMod")) // или другие моды
-                    .map(Path::toFile)
-                    .forEach(file -> {
-                        if (file.delete()) {
-                            log.warn("🔥🔥🔥 DELETED BANNED MOD: {} 🔥🔥🔥", file.getAbsolutePath());
-                        }
-                    });
-        } catch (IOException e) {
-            log.error("Error cleaning mods", e);
+    /**
+     * Синхронизирует папку mods с выбором игрока.
+     * Удаляет выключенные моды, проверяет наличие включенных.
+     */
+    private void syncMods(Path clientRoot, InstanceProfile profile, List<OptionalMod> allMods) throws IOException {
+        log.info("Synchronizing optional mods...");
+        Path modsDir = clientRoot.resolve("mods");
+        if (!Files.exists(modsDir)) Files.createDirectories(modsDir);
+
+        Map<String, Boolean> state = profile.getOptionalModsState();
+
+        for (OptionalMod mod : allMods) {
+            boolean isEnabled = state.getOrDefault(mod.getId(), mod.isDefault());
+
+            if (isEnabled) {
+                // Если включен -> удаляем конфликты
+                if (mod.getExcludings() != null) {
+                    for (String exclude : mod.getExcludings()) {
+                        Files.deleteIfExists(modsDir.resolve(exclude));
+                    }
+                }
+                // TODO: Здесь же можно проверять наличие jars и докачивать их
+            } else {
+                // Если выключен -> удаляем файлы самого мода
+                for (String jar : mod.getJars()) {
+                    Files.deleteIfExists(modsDir.resolve(jar));
+                    log.debug("Removed disabled mod: {}", jar);
+                }
+            }
         }
     }
 

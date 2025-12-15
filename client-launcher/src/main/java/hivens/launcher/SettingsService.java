@@ -1,8 +1,6 @@
 package hivens.launcher;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonIOException;
-import com.google.gson.JsonSyntaxException;
 import hivens.core.api.ISettingsService;
 import hivens.core.data.SettingsData;
 import org.slf4j.Logger;
@@ -12,79 +10,57 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.util.Objects;
 
-/**
- * Реализация сервиса настроек.
- * Читает и сохраняет SettingsData в .json файл.
- */
 public class SettingsService implements ISettingsService {
 
     private static final Logger log = LoggerFactory.getLogger(SettingsService.class);
 
     private final Gson gson;
-    private final Path settingsFilePath;
+    private final Path settingsFile;
+    private SettingsData cachedSettings; // Кэш в памяти
 
-    /**
-     * Конструктор для внедрения зависимостей.
-     * @param gson Экземпляр Gson (из DI).
-     * @param settingsFilePath Путь к файлу настроек (из DI).
-     */
-    public SettingsService(Gson gson, Path settingsFilePath) {
-        this.gson = Objects.requireNonNull(gson, "Gson cannot be null");
-        this.settingsFilePath = Objects.requireNonNull(settingsFilePath, "Settings path cannot be null");
+    public SettingsService(Gson gson, Path settingsFile) {
+        this.gson = gson;
+        this.settingsFile = settingsFile;
+        // Загружаем сразу при старте
+        reload();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public SettingsData loadSettings() throws IOException {
-        try (Reader reader = Files.newBufferedReader(settingsFilePath)) {
-            
-            SettingsData settings = gson.fromJson(reader, SettingsData.class);
-            log.info("Settings loaded from {}", settingsFilePath);
-            
-            // Проверка на случай, если файл пустой или поврежден
-            if (settings == null) {
-                log.warn("Settings file is empty or corrupt. Returning defaults.");
-                return SettingsData.defaults();
+    public SettingsData getSettings() {
+        if (cachedSettings == null) {
+            reload();
+        }
+        return cachedSettings;
+    }
+
+    @Override
+    public void saveSettings(SettingsData settings) {
+        this.cachedSettings = settings; // Обновляем кэш
+        try {
+            if (settingsFile.getParent() != null) {
+                Files.createDirectories(settingsFile.getParent());
             }
-            return settings;
-
-        } catch (NoSuchFileException e) {
-            // Файл не найден - это нормально при первом запуске
-            log.info("No settings file found at {}. Creating default settings.", settingsFilePath);
-            SettingsData defaults = SettingsData.defaults();
-            saveSettings(defaults); // Сохраняем настройки по умолчанию
-            return defaults;
-        } catch (JsonSyntaxException | JsonIOException e) {
-            // Файл поврежден
-            log.error("Failed to parse settings.json. Returning defaults.", e);
-            return SettingsData.defaults();
+            try (Writer writer = Files.newBufferedWriter(settingsFile)) {
+                gson.toJson(settings, writer);
+            }
+        } catch (IOException e) {
+            log.error("Failed to save settings", e);
         }
-        // (IOException пробрасывается выше)
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void saveSettings(SettingsData settings) throws IOException {
-        Objects.requireNonNull(settings, "SettingsData cannot be null");
-
-        // Убедимся, что директория существует
-        Path parentDir = settingsFilePath.getParent();
-        if (parentDir != null && !Files.exists(parentDir)) {
-            Files.createDirectories(parentDir);
+    private void reload() {
+        if (!Files.exists(settingsFile)) {
+            cachedSettings = SettingsData.defaults();
+            return;
         }
-
-        try (Writer writer = Files.newBufferedWriter(settingsFilePath)) {
-            gson.toJson(settings, writer);
-            log.info("Settings saved to {}", settingsFilePath);
+        try (Reader reader = Files.newBufferedReader(settingsFile)) {
+            cachedSettings = gson.fromJson(reader, SettingsData.class);
+            if (cachedSettings == null) cachedSettings = SettingsData.defaults();
+        } catch (IOException e) {
+            log.error("Failed to load settings, using defaults", e);
+            cachedSettings = SettingsData.defaults();
         }
-        // (IOException пробрасывается выше)
     }
 }

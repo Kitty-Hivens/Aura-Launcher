@@ -1,15 +1,18 @@
 package hivens.ui;
 
 import hivens.core.api.model.ServerProfile;
-import hivens.core.data.ServerData;
+import hivens.core.data.InstanceProfile;
+import hivens.core.data.OptionalMod;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
+import hivens.launcher.ManifestProcessorService;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.paint.Color;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.slf4j.Logger;
@@ -17,21 +20,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.Objects;
+import java.util.List;
 
-/**
- * Главный класс приложения (точка входа JavaFX).
- * Отвечает за запуск UI, DI и управление сценами.
- */
 public class Main extends Application {
 
     private static final Logger log = LoggerFactory.getLogger(Main.class);
-
     private LauncherDI container;
     private Stage primaryStage;
-
-
-    private Thread updateThread;
+    private SessionData currentSession;
 
     @Override
     public void init() {
@@ -41,113 +37,125 @@ public class Main extends Application {
     @Override
     public void start(Stage primaryStage) throws IOException {
         this.primaryStage = primaryStage;
-        // Убираем стандартную рамку ОС (выглядит современно + WM часто делает такие окна плавающими)
         primaryStage.initStyle(StageStyle.TRANSPARENT);
-        // Запрещаем менять размер (WM поймет, что это диалог/лаунчер)
-        primaryStage.setResizable(false);
-        showLoginScene(); // Запускаем Login
+        showLoginScene();
     }
 
-    /**
-     * Загружает и отображает сцену Логина.
-     */
     public void showLoginScene() throws IOException {
         FXMLLoader loader = loadFXML("LoginForm.fxml");
-
-        LoginController controller = new LoginController(container, this);
-        loader.setController(controller);
-
-        // loader.setControllerFactory(...);
+        // Фабрика для LoginController
+        loader.setControllerFactory(clz -> new LoginController(container, this));
 
         Parent root = loader.load();
-        primaryStage.setTitle("Aura Launcher");
-        primaryStage.setScene(new Scene(root));
+        Scene scene = new Scene(root);
+        scene.setFill(Color.TRANSPARENT);
+
+        // Применяем тему
+        ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
+
+        primaryStage.setScene(scene);
         primaryStage.show();
     }
 
-    /**
-     * Запускает Оркестратор и переключается на сцену Прогресса.
-     */
-    public void showProgressScene(SessionData session, ServerProfile server, SettingsData settings) throws IOException {
+    public void showAuraMain() {
+        try {
+            FXMLLoader loader = loadFXML("AuraMain.fxml");
+            // В AuraMainController нужно добавить конструктор с DI
+            // loader.setControllerFactory(clz -> new AuraMainController(container));
+            // Пока оставим стандартный, если контроллер простой
+
+            Parent root = loader.load();
+            Scene scene = new Scene(root);
+            scene.setFill(Color.TRANSPARENT);
+            ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
+
+            primaryStage.setScene(scene);
+            primaryStage.centerOnScreen();
+        } catch (IOException e) {
+            log.error("Failed to show Aura Main", e);
+        }
+    }
+
+    // --- ОТКРЫТИЕ НАСТРОЕК СЕРВЕРА ---
+    public void showServerSettings(ServerProfile server) {
+        try {
+            FXMLLoader loader = loadFXML("ServerSettings.fxml");
+            ServerSettingsController controller = new ServerSettingsController();
+            loader.setController(controller);
+
+            Stage settingsStage = new Stage();
+            settingsStage.initOwner(primaryStage);
+            settingsStage.initModality(Modality.WINDOW_MODAL);
+            settingsStage.initStyle(StageStyle.TRANSPARENT);
+
+            Parent root = loader.load();
+            Scene scene = new Scene(root);
+            scene.setFill(Color.TRANSPARENT);
+            ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
+            settingsStage.setScene(scene);
+
+            // ЗАГРУЗКА ДАННЫХ
+            InstanceProfile profile = container.getProfileManager().getProfile(server.getAssetDir());
+
+            // Используем наш новый метод в ManifestProcessorService
+            List<OptionalMod> mods = container.getManifestProcessorService()
+                    .getOptionalModsForClient(server.getVersion());
+
+            controller.setup(profile, container.getProfileManager(), mods, settingsStage);
+
+            settingsStage.showAndWait();
+
+        } catch (IOException e) {
+            log.error("Failed to open settings", e);
+        }
+    }
+
+    // --- ЗАПУСК (ПРОГРЕСС) ---
+    public void showProgressScene(SessionData session, ServerProfile server) throws IOException {
         FXMLLoader loader = loadFXML("Progress.fxml");
+        SettingsData globalSettings = container.getSettingsService().getSettings();
 
         UpdateAndLaunchTask task = new UpdateAndLaunchTask(
                 container,
                 session,
                 server,
-                container.getDataDirectory(),
-                Paths.get(settings.javaPath()),
-                settings.memoryMB()
+                container.getDataDirectory().resolve("clients").resolve(server.getAssetDir()),
+                // Если Java нет в глобалках, передаем null, LauncherService сам найдет
+                (globalSettings.getJavaPath() != null) ? Paths.get(globalSettings.getJavaPath()) : null,
+                globalSettings.getMemoryMB()
         );
 
-        loader.setControllerFactory(controllerClass -> {
-            if (controllerClass == ProgressController.class) {
-                return new ProgressController(this);
-            }
-            return createController(controllerClass);
-        });
-
+        loader.setControllerFactory(clz -> new ProgressController(this));
         Parent root = loader.load();
+        Scene scene = new Scene(root);
+        scene.setFill(Color.TRANSPARENT);
+        ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
+
         ProgressController controller = loader.getController();
+        Thread thread = new Thread(task);
+        thread.setDaemon(true);
+        controller.startProcess(task, thread);
 
+        primaryStage.setScene(scene);
+    }
 
-        this.updateThread = new Thread(task);
-        this.updateThread.setDaemon(true); // Чтобы не блокировал выход
-        controller.startProcess(task, this.updateThread); // Запускаем!
-
-        primaryStage.setTitle("SCOL - Запуск...");
-        primaryStage.setScene(new Scene(root));
+    private FXMLLoader loadFXML(String fxml) {
+        return new FXMLLoader(getClass().getResource("/fxml/" + fxml));
     }
 
     /**
-     * Отображает сцену Настроек.
-     */
-    public void showSettingsScene() throws IOException {
-        FXMLLoader loader = loadFXML("Settings.fxml");
-
-        loader.setControllerFactory(controllerClass -> {
-            if (controllerClass == SettingsController.class) {
-                return new SettingsController(container, this);
-            }
-            return createController(controllerClass);
-        });
-
-        Parent root = loader.load();
-        primaryStage.setTitle("SCOL - Настройки");
-        primaryStage.setScene(new Scene(root));
-    }
-
-    /**
-     * Скрывает окно лаунчера (когда игра запускается).
+     * Скрывает главное окно (вызывается при успешном старте игры).
      */
     public void hideWindow() {
-        Platform.runLater(primaryStage::hide);
+        Platform.runLater(() -> {
+            if (primaryStage != null) {
+                primaryStage.hide();
+            }
+        });
     }
 
-    /**
-     * Вызывается при закрытии окна
-     */
-    @Override
-    public void stop() {
-        log.info("Stopping application...");
-        if (updateThread != null && updateThread.isAlive()) {
-            log.info("Interrupting update/download thread.");
-            updateThread.interrupt(); // Прерываем загрузку/проверку
-        }
+    public void setSession(SessionData session) {
+        this.currentSession = session;
     }
 
-    // --- Вспомогательные методы ---
-    private FXMLLoader loadFXML(String fxmlFile) {
-        return new FXMLLoader(Objects.requireNonNull(
-                getClass().getResource("/fxml/" + fxmlFile)
-        ));
-    }
-    private Object createController(Class<?> controllerClass) {
-        try {
-            return controllerClass.getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            log.error("Failed to create controller: {}", controllerClass.getName(), e);
-            throw new RuntimeException(e);
-        }
-    }
 }

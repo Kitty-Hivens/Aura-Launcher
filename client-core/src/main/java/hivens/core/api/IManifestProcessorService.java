@@ -2,20 +2,23 @@ package hivens.core.api;
 
 import hivens.core.data.FileData;
 import hivens.core.data.FileManifest;
+import hivens.core.data.OptionalMod;
+
+import java.util.List;
 import java.util.Map;
 
-/**
- * Контракт для сервиса, преобразующего древовидный FileManifest
- * в плоскую карту (Map) для служб целостности и загрузки.
- */
 public interface IManifestProcessorService {
 
     /**
      * Рекурсивно "выпрямляет" (flattens) древовидный манифест файлов.
-     *
-     * @param manifest Корневой объект FileManifest, полученный из SessionData.
-     * @return Плоская карта (Map), где Ключ - относительный путь
-     * (например, "mods/mod.jar"), а Значение - FileData (md5, size).
+     * @return Плоская карта путь -> данные.
      */
     Map<String, FileData> flattenManifest(FileManifest manifest);
+
+    FileManifest processManifest(String version);
+
+    /**
+     * Возвращает список опциональных модификаций (из манифеста или конфига).
+     */
+    List<OptionalMod> getOptionalModsForClient(String version);
 }

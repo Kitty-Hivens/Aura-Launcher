@@ -13,19 +13,15 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 
-/**
- * Контейнер Dependency Injection (DI).
- */
 @Getter
 public class LauncherDI {
 
-    private final Path configDirectory;
     private final Path dataDirectory;
-    private final Path settingsFilePath;
     private final OkHttpClient httpClient;
     private final Gson gson;
+
+    // Сервисы
     private final IAuthService authService;
     private final IFileIntegrityService integrityService;
     private final IFileDownloadService downloadService;
@@ -33,19 +29,20 @@ public class LauncherDI {
     private final ILauncherService launcherService;
     private final IServerListService serverListService;
     private final ISettingsService settingsService;
+    private final ProfileManager profileManager;
+    private final JavaManagerService javaManagerService;
 
     public LauncherDI() {
         String userHome = System.getProperty("user.home");
         this.dataDirectory = Paths.get(userHome, ".aura");
-        this.configDirectory = this.dataDirectory;
-        this.settingsFilePath = this.configDirectory.resolve("settings.json");
+        
+        // Gson
         this.gson = new GsonBuilder().setPrettyPrinting().create();
 
+        // HTTP & Proxy
         Authenticator proxyAuthenticator = (route, response) -> {
             String credential = Credentials.basic("proxyuser", "proxyuserproxyuser");
-            return response.request().newBuilder()
-                    .header("Proxy-Authorization", credential)
-                    .build();
+            return response.request().newBuilder().header("Proxy-Authorization", credential).build();
         };
 
         this.httpClient = new OkHttpClient.Builder()
@@ -53,12 +50,27 @@ public class LauncherDI {
                 .proxyAuthenticator(proxyAuthenticator)
                 .build();
 
+        // Базовые сервисы
         this.authService = new AuthService(httpClient, gson);
         this.integrityService = new FileIntegrityService();
         this.downloadService = new FileDownloadService(httpClient, gson);
         this.manifestProcessorService = new ManifestProcessorService();
-        this.launcherService = new LauncherService(manifestProcessorService);
         this.serverListService = new ServerListService();
-        this.settingsService = new SettingsService(gson, settingsFilePath);
+        this.settingsService = new SettingsService(gson, dataDirectory.resolve("settings.json"));
+
+        // --- ИНИЦИАЛИЗАЦИЯ НОВЫХ МОДУЛЕЙ ---
+        
+        // 1. Менеджер профилей (InstanceProfile)
+        this.profileManager = new ProfileManager(dataDirectory, gson);
+        
+        // 2. Менеджер Java (Скачивание JDK)
+        this.javaManagerService = new JavaManagerService(dataDirectory, httpClient);
+
+        // 3. Лаунчер Сервис (теперь принимает ВСЕ зависимости)
+        this.launcherService = new LauncherService(
+            manifestProcessorService, 
+            profileManager, 
+            javaManagerService
+        );
     }
 }

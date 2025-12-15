@@ -1,58 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
 <?import javafx.scene.shape.Rectangle?>
-<StackPane fx:id="root" prefHeight="500.0" prefWidth="700.0" styleClass="settings-window" stylesheets="@aura-theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="hivens.ui.ServerSettingsController">
 
-    <Rectangle height="500.0" width="700.0" opacity="0.8" fill="#141e30" arcWidth="30" arcHeight="30"/>
+<StackPane fx:id="root" prefHeight="600.0" prefWidth="900.0" styleClass="settings-window" stylesheets="@aura-theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="hivens.ui.ServerSettingsController">
 
-    <VBox spacing="20">
-        <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+    <Rectangle height="600.0" width="900.0" arcWidth="20" arcHeight="20" style="-fx-fill: -fx-panel-bg;" opacity="0.98"/>
 
-        <Label fx:id="titleLabel" text="НАСТРОЙКИ: INDUSTRIAL" style="-fx-text-fill: white; -fx-font-size: 24px; -fx-font-weight: bold;"/>
+    <VBox>
+
+        <HBox alignment="CENTER_LEFT" style="-fx-padding: 25; -fx-border-color: transparent transparent -fx-panel-border transparent; -fx-border-width: 0 0 1 0;">
+            <VBox>
+                <Label fx:id="titleLabel" text="НАСТРОЙКИ КЛИЕНТА" styleClass="label-title"/>
+                <Label text="Тонкая настройка производительности и модов" styleClass="label-subtitle"/>
+            </VBox>
+        </HBox>
 
         <TabPane tabClosingPolicy="UNAVAILABLE" styleClass="aura-tabs" VBox.vgrow="ALWAYS">
 
             <Tab text="СИСТЕМА">
-                <VBox spacing="25" style="-fx-padding: 20;">
+                <VBox spacing="30" style="-fx-padding: 40;">
 
-                    <VBox spacing="10">
-                        <Label text="Выделенная память (RAM)" styleClass="setting-label"/>
-                        <HBox spacing="15" alignment="CENTER_LEFT">
-                            <Slider fx:id="ramSlider" min="1024" max="8192" blockIncrement="512" HBox.hgrow="ALWAYS"/>
-                            <Label fx:id="ramValueLabel" text="2048 MB" style="-fx-text-fill: #00aaff; -fx-font-weight: bold;"/>
+                    <VBox spacing="15">
+                        <HBox alignment="CENTER_LEFT" spacing="15">
+                            <Label text="Выделенная память (RAM):" styleClass="setting-label"/>
+                            <Label fx:id="ramValueLabel" text="4096 MB" style="-fx-text-fill: -fx-accent-color; -fx-font-weight: bold; -fx-font-size: 16px;"/>
                         </HBox>
+
+                        <Slider fx:id="ramSlider" min="1024" max="16384" blockIncrement="512" showTickMarks="true" majorTickUnit="2048" snapToTicks="true"/>
+
+                        <Label text="Рекомендуем: 4096 MB для большинства сборок с модами." styleClass="label-subtitle"/>
                     </VBox>
 
-                    <VBox spacing="10">
-                        <Label text="Путь к Java (Оставьте пустым для авто-выбора)" styleClass="setting-label"/>
+                    <VBox spacing="15">
+                        <Label text="Путь к Java (Оставьте пустым для авто-выбора):" styleClass="setting-label"/>
                         <HBox spacing="10">
-                            <TextField fx:id="javaPathField" promptText="C:\Program Files\Java\jdk-21..." HBox.hgrow="ALWAYS" styleClass="aura-input"/>
-                            <Button text="📂" styleClass="icon-btn" onAction="#browseJava"/>
+                            <TextField fx:id="javaPathField" promptText="Автоматически (JavaManager загрузит нужную версию)" HBox.hgrow="ALWAYS" styleClass="aura-input"/>
+                            <Button text="..." styleClass="icon-btn" onAction="#browseJava"/>
                         </HBox>
                     </VBox>
 
-                    <VBox spacing="10">
-                        <Label text="Аргументы JVM (Для профи)" styleClass="setting-label"/>
-                        <TextField fx:id="jvmArgsField" promptText="-XX:+UseG1GC" styleClass="aura-input"/>
+                    <VBox spacing="15">
+                        <Label text="Аргументы запуска (JVM Flags):" styleClass="setting-label"/>
+                        <TextField fx:id="jvmArgsField" promptText="Например: -XX:+UseZGC" styleClass="aura-input"/>
                     </VBox>
-
                 </VBox>
             </Tab>
 
             <Tab text="МОДЫ">
-                <ScrollPane fitToWidth="true" styleClass="transparent-scroll">
-                    <VBox fx:id="modsContainer" spacing="15" style="-fx-padding: 10;">
-                        <Label text="Загрузка списка модов..." style="-fx-text-fill: gray;"/>
+                <ScrollPane fitToWidth="true" styleClass="transparent-scroll" hbarPolicy="NEVER">
+                    <VBox fx:id="modsContainer" spacing="10" style="-fx-padding: 30;">
+                        <Label text="Загрузка списка модов..." styleClass="label-subtitle"/>
                     </VBox>
                 </ScrollPane>
             </Tab>
 
         </TabPane>
 
-        <HBox alignment="CENTER_RIGHT" spacing="15">
+        <HBox alignment="CENTER_RIGHT" spacing="20" style="-fx-padding: 25; -fx-background-color: rgba(0,0,0,0.2); -fx-background-radius: 0 0 20 20;">
             <Button text="ОТМЕНА" onAction="#close" styleClass="aura-btn-secondary"/>
             <Button text="СОХРАНИТЬ" onAction="#save" styleClass="aura-btn-primary"/>
         </HBox>

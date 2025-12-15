@@ -1,6 +1,8 @@
+/* === AURA THEME (Fixed) === */
+
 /* Окно настроек */
-.settings-window {
-    -fx-background-color: transparent; /* Прозрачность для закругленных углов */
+.settings-window, .root-pane {
+    -fx-background-color: transparent;
 }
 
 /* Вкладки */
@@ -14,6 +16,7 @@
     -fx-font-weight: bold;
     -fx-border-color: transparent transparent #444 transparent;
     -fx-border-width: 2px;
+    -fx-padding: 10 20;
 }
 .aura-tabs .tab:selected {
     -fx-text-fill: white;
@@ -25,20 +28,35 @@
 }
 
 /* Поля ввода */
-.aura-input {
+.aura-input, .text-field, .password-field, .combo-box {
     -fx-background-color: rgba(255,255,255,0.1);
     -fx-text-fill: white;
     -fx-background-radius: 5;
     -fx-border-color: rgba(255,255,255,0.2);
     -fx-border-radius: 5;
+    -fx-padding: 8 12;
 }
 .setting-label {
     -fx-text-fill: #ccc;
     -fx-font-size: 14px;
 }
+.label-title {
+    -fx-text-fill: white;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+.label-subtitle {
+    -fx-text-fill: #aaa;
+    -fx-font-size: 14px;
+}
+/* Ошибка (для LoginForm) */
+.label-error {
+    -fx-text-fill: #ff5e62;
+    -fx-font-size: 12px;
+}
 
 /* Кнопки */
-.aura-btn-primary {
+.aura-btn-primary, .btn-accent {
     -fx-background-color: #00aaff;
     -fx-text-fill: white;
     -fx-background-radius: 20;
@@ -46,7 +64,7 @@
     -fx-cursor: hand;
     -fx-padding: 8 25;
 }
-.aura-btn-secondary {
+.aura-btn-secondary, .btn-secondary {
     -fx-background-color: transparent;
     -fx-text-fill: #aaa;
     -fx-background-radius: 20;
@@ -54,4 +72,36 @@
     -fx-border-radius: 20;
     -fx-cursor: hand;
     -fx-padding: 7 24;
+}
+
+/* --- НОВЫЕ КЛАССЫ (FIX) --- */
+
+/* Кнопка-иконка (папка) */
+.icon-btn {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-text-fill: white;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+    -fx-padding: 8 12;
+    -fx-border-color: rgba(255,255,255,0.2);
+    -fx-border-radius: 5;
+}
+.icon-btn:hover {
+    -fx-background-color: rgba(255,255,255,0.2);
+}
+
+/* Прозрачный скролл (для списка модов) */
+.transparent-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+.transparent-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+.scroll-bar .thumb {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-background-radius: 10;
 }
