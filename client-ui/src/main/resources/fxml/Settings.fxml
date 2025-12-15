@@ -12,38 +12,38 @@
 
 <StackPane fx:id="root" prefHeight="400.0" prefWidth="500.0" stylesheets="@aura-theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="hivens.ui.SettingsController">
 
-    <Rectangle height="400.0" width="500.0" arcWidth="20" arcHeight="20" style="-fx-fill: -fx-panel-bg;" opacity="0.98"/>
+    <Rectangle height="400.0" width="500.0" arcWidth="20" arcHeight="20" fill="#141e30" opacity="0.95"/>
 
-    <VBox>
-        <HBox alignment="CENTER_LEFT" style="-fx-padding: 20; -fx-border-color: transparent transparent -fx-panel-border transparent; -fx-border-width: 0 0 1 0;">
+    <VBox spacing="0">
+        <HBox alignment="CENTER_LEFT" style="-fx-padding: 20;">
             <Label text="ГЛОБАЛЬНЫЕ НАСТРОЙКИ" styleClass="label-title" style="-fx-font-size: 20px;"/>
         </HBox>
 
         <VBox spacing="20" style="-fx-padding: 30;" VBox.vgrow="ALWAYS">
 
-            <VBox spacing="8">
-                <Label text="Тема оформления" styleClass="setting-label"/>
-                <ComboBox fx:id="themeSelector" prefWidth="200.0" styleClass="combo-box"/>
-            </VBox>
-
-            <VBox spacing="8">
-                <Label text="Путь к Java (по умолчанию)" styleClass="setting-label"/>
+            <VBox spacing="5">
+                <Label text="Путь к Java" styleClass="setting-label"/>
                 <HBox spacing="10">
-                    <TextField fx:id="javaPathField" promptText="Авто-определение" HBox.hgrow="ALWAYS" styleClass="aura-input"/>
+                    <TextField fx:id="javaPathField" promptText="Авто" HBox.hgrow="ALWAYS" styleClass="aura-input"/>
                     <Button text="..." onAction="#onBrowseJava" styleClass="icon-btn"/>
                 </HBox>
             </VBox>
 
-            <VBox spacing="8">
-                <Label text="Память (MB) по умолчанию" styleClass="setting-label"/>
-                <TextField fx:id="memoryField" promptText="4096" styleClass="aura-input" maxWidth="150.0"/>
+            <VBox spacing="5">
+                <Label text="Память (MB)" styleClass="setting-label"/>
+                <TextField fx:id="memoryField" promptText="4096" styleClass="aura-input" maxWidth="100"/>
             </VBox>
 
-            <CheckBox fx:id="closeAfterStart" text="Закрывать лаунчер после запуска игры" styleClass="aura-checkbox"/>
+            <CheckBox fx:id="closeAfterStart" text="Закрывать после запуска" styleClass="aura-checkbox" style="-fx-text-fill: white;"/>
+
+            <VBox spacing="5">
+                <Label text="Тема" styleClass="setting-label"/>
+                <ComboBox fx:id="themeSelector" styleClass="aura-input"/>
+            </VBox>
 
         </VBox>
 
-        <HBox alignment="CENTER_RIGHT" spacing="15" style="-fx-padding: 20; -fx-background-color: rgba(0,0,0,0.2); -fx-background-radius: 0 0 20 20;">
+        <HBox alignment="CENTER_RIGHT" spacing="15" style="-fx-padding: 20;">
             <Button text="ОТМЕНА" onAction="#onClose" styleClass="aura-btn-secondary"/>
             <Button text="СОХРАНИТЬ" onAction="#onSave" styleClass="aura-btn-primary"/>
         </HBox>

@@ -74,8 +74,6 @@
     -fx-padding: 7 24;
 }
 
-/* --- НОВЫЕ КЛАССЫ (FIX) --- */
-
 /* Кнопка-иконка (папка) */
 .icon-btn {
     -fx-background-color: rgba(255,255,255,0.1);
@@ -104,4 +102,59 @@
 .scroll-bar .thumb {
     -fx-background-color: rgba(255,255,255,0.1);
     -fx-background-radius: 10;
+}
+
+/* Кнопка-иконка (папка) */
+.icon-btn {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-text-fill: white;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+    -fx-padding: 8 12;
+    -fx-border-color: rgba(255,255,255,0.2);
+    -fx-border-radius: 5;
+}
+.icon-btn:hover {
+    -fx-background-color: rgba(255,255,255,0.2);
+}
+
+/* Прозрачный скролл */
+.transparent-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+.transparent-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+.scroll-bar .thumb {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-background-radius: 10;
+}
+
+/* Вкладки */
+.aura-tabs .tab-header-area .tab-header-background {
+    -fx-background-color: transparent;
+}
+.aura-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-text-fill: #888;
+    -fx-font-weight: bold;
+    -fx-border-color: transparent transparent #444 transparent;
+    -fx-border-width: 2px;
+    -fx-padding: 10 20;
+}
+.aura-tabs .tab:selected {
+    -fx-text-fill: white;
+    -fx-border-color: transparent transparent #00aaff transparent;
+}
+/* Чекбокс */
+.aura-checkbox .box {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-border-color: rgba(255,255,255,0.3);
+}
+.aura-checkbox:selected .mark {
+    -fx-background-color: white;
 }

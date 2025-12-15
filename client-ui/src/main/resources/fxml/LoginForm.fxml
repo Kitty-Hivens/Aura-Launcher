@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.TextField?>
@@ -8,15 +9,15 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.shape.Rectangle?>
 
-<StackPane fx:id="root" prefHeight="450.0" prefWidth="360.0" stylesheets="@aura-theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="hivens.ui.LoginController">
+<StackPane fx:id="root" prefHeight="480.0" prefWidth="360.0" stylesheets="@aura-theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="hivens.ui.LoginController">
 
-    <Rectangle height="450.0" width="360.0" arcWidth="20" arcHeight="20" style="-fx-fill: -fx-panel-bg;" opacity="0.95"/>
+    <Rectangle height="480.0" width="360.0" arcWidth="25" arcHeight="25" fill="#141e30" opacity="0.9"/>
 
-    <VBox alignment="CENTER" spacing="25" style="-fx-padding: 40;">
+    <VBox alignment="CENTER" spacing="20" style="-fx-padding: 40;">
 
         <VBox alignment="CENTER" spacing="5">
-            <Label text="AURA" styleClass="label-title" style="-fx-font-size: 36px;"/>
-            <Label text="LAUNCHER" styleClass="label-subtitle"/>
+            <Label text="AURA" styleClass="label-title" style="-fx-font-size: 32px;"/>
+            <Label text="SCOL EDITION" styleClass="label-subtitle"/>
         </VBox>
 
         <VBox spacing="15" maxWidth="Infinity">
@@ -29,13 +30,19 @@
                 <Label text="Пароль" styleClass="setting-label"/>
                 <PasswordField fx:id="passwordField" promptText="Ваш пароль" styleClass="aura-input"/>
             </VBox>
+
+            <VBox spacing="5">
+                <Label text="Сервер" styleClass="setting-label"/>
+                <ComboBox fx:id="serversField" maxWidth="Infinity" styleClass="aura-input"/>
+            </VBox>
         </VBox>
 
-        <Label fx:id="statusLabel" styleClass="label-subtitle" style="-fx-text-fill: #ff5e62;" wrapText="true"/>
+        <Label fx:id="statusLabel" text="" styleClass="label-error" wrapText="true" textAlignment="CENTER"/>
 
         <VBox spacing="10" maxWidth="Infinity">
-            <Button fx:id="loginButton" text="ВОЙТИ В СИСТЕМУ" onAction="#onLogin" styleClass="aura-btn-primary" maxWidth="Infinity"/>
-            <Button text="ЗАКРЫТЬ" onAction="#onClose" styleClass="aura-btn-secondary" maxWidth="Infinity"/>
+            <Button fx:id="loginButton" text="ВОЙТИ" onAction="#onLogin" styleClass="aura-btn-primary" maxWidth="Infinity"/>
+            <Button text="НАСТРОЙКИ" onAction="#onSettings" styleClass="aura-btn-secondary" maxWidth="Infinity"/>
+            <Button text="ЗАКРЫТЬ" onAction="#onClose" styleClass="icon-btn" maxWidth="Infinity" style="-fx-background-color: rgba(255,0,0,0.1);"/>
         </VBox>
 
     </VBox>
