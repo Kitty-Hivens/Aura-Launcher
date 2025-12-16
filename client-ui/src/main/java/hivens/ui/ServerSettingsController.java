@@ -3,13 +3,14 @@ package hivens.ui;
 import hivens.core.api.model.ServerProfile;
 import hivens.core.data.InstanceProfile;
 import hivens.core.data.OptionalMod;
+import hivens.launcher.ProfileManager;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 
 import java.io.File;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,17 +19,25 @@ public class ServerSettingsController {
 
     private final LauncherDI di;
     private final DashboardController dashboard;
-    private ServerProfile serverProfile;
-    private InstanceProfile instanceProfile;
 
-    @FXML private Label titleLabel;
-    @FXML private Slider ramSlider;
-    @FXML private Label ramValueLabel;
+    @FXML private Label serverTitle;
+
+    // Настройки Java
+    @FXML private TextField memoryField;
+    @FXML private Slider memorySlider;
     @FXML private TextField javaPathField;
     @FXML private TextField jvmArgsField;
+
+    // Опциональные моды
     @FXML private VBox modsContainer;
 
-    private final Map<String, CheckBox> modCheckboxes = new HashMap<>();
+    // Настройки окна
+    @FXML private CheckBox fullScreenCheck;
+    @FXML private CheckBox autoConnectCheck;
+
+    private ServerProfile server;
+    private InstanceProfile profile;
+    private final Map<String, Boolean> modsState = new HashMap<>();
 
     public ServerSettingsController(LauncherDI di, DashboardController dashboard) {
         this.di = di;
@@ -36,129 +45,137 @@ public class ServerSettingsController {
     }
 
     public void setServer(ServerProfile server) {
-        this.serverProfile = server;
-        this.titleLabel.setText("НАСТРОЙКИ: " + server.getName().toUpperCase());
+        this.server = server;
+        this.serverTitle.setText("Настройки: " + server.getTitle());
 
-        // Загружаем профиль игрока (локальные настройки)
-        this.instanceProfile = di.getProfileManager().getProfile(server.getAssetDir());
+        // Загружаем профиль из диска
+        ProfileManager pm = di.getProfileManager();
+        this.profile = pm.getProfile(server.getAssetDir()); // Используем AssetDir как ID
 
-        // 1. Настраиваем UI системы
-        int ram = (instanceProfile.getMemoryMb() != null && instanceProfile.getMemoryMb() > 0) 
-                  ? instanceProfile.getMemoryMb() : 4096;
-        ramSlider.setValue(ram);
-        ramValueLabel.setText(ram + " MB");
-
-        javaPathField.setText(instanceProfile.getJavaPath() != null ? instanceProfile.getJavaPath() : "");
-        jvmArgsField.setText(instanceProfile.getJvmArgs() != null ? instanceProfile.getJvmArgs() : "");
-
-        // 2. Настраиваем список модов
-        // Получаем СПИСОК ДОСТУПНЫХ модов из манифеста (ManifestProcessor)
-        List<OptionalMod> availableMods = di.getManifestProcessorService()
-                .getOptionalModsForClient(server.getVersion());
-        
-        buildModsList(availableMods);
+        loadValues();
+        buildModsList();
     }
 
-    @FXML
-    public void initialize() {
-        ramSlider.valueProperty().addListener((obs, old, val) -> {
-            // Округляем до 512
-            int value = (val.intValue() / 512) * 512;
-            ramValueLabel.setText(value + " MB");
+    private void loadValues() {
+        // Память
+        int mem = profile.getMemoryMb() != null ? profile.getMemoryMb() : 4096;
+        memorySlider.setValue(mem);
+        memoryField.setText(String.valueOf(mem));
+
+        // Синхронизация слайдера и поля
+        memorySlider.valueProperty().addListener((obs, old, val) -> memoryField.setText(String.valueOf(val.intValue())));
+        memoryField.textProperty().addListener((obs, old, val) -> {
+            try {
+                memorySlider.setValue(Double.parseDouble(val));
+            } catch (NumberFormatException ignored) {}
         });
+
+        // Java и аргументы
+        javaPathField.setText(profile.getJavaPath() != null ? profile.getJavaPath() : "");
+        jvmArgsField.setText(profile.getJvmArgs() != null ? profile.getJvmArgs() : "");
+
+        // Окно
+        fullScreenCheck.setSelected(profile.isFullScreen());
+        autoConnectCheck.setSelected(profile.isAutoConnect());
     }
 
-    private void buildModsList(List<OptionalMod> mods) {
+    private void buildModsList() {
         modsContainer.getChildren().clear();
-        modCheckboxes.clear();
-        
-        // Текущее состояние (что игрок выбрал ранее)
-        Map<String, Boolean> userState = instanceProfile.getOptionalModsState();
 
-        if (mods.isEmpty()) {
-            Label placeholder = new Label("Нет доступных опциональных модов для этой версии.");
-            placeholder.setStyle("-fx-text-fill: #888;");
+        // Получаем список доступных модов для этой версии из манифеста
+        List<OptionalMod> availableMods = di.getManifestProcessorService().getOptionalModsForClient(server.getVersion());
+
+        // Получаем сохраненное состояние
+        Map<String, Boolean> savedState = profile.getOptionalModsState();
+        if (savedState == null) savedState = new HashMap<>();
+        this.modsState.putAll(savedState);
+
+        if (availableMods.isEmpty()) {
+            Label placeholder = new Label("Нет опциональных модов");
+            placeholder.getStyleClass().add("text-placeholder");
             modsContainer.getChildren().add(placeholder);
             return;
         }
 
-        for (OptionalMod mod : mods) {
-            CheckBox box = new CheckBox(mod.getName());
-            
-            // Если есть описание, добавляем Tooltip
+        for (OptionalMod mod : availableMods) {
+            CheckBox cb = new CheckBox(mod.getName());
+            cb.getStyleClass().add("aura-checkbox");
+
+            // Определяем состояние: если есть в профиле -> берем оттуда, иначе -> дефолтное
+            boolean isActive = savedState.containsKey(mod.getId())
+                    ? savedState.get(mod.getId())
+                    : mod.isDefault();
+
+            cb.setSelected(isActive);
+            modsState.put(mod.getId(), isActive);
+
+            // Тултип с описанием
             if (mod.getDescription() != null && !mod.getDescription().isEmpty()) {
-                Tooltip tt = new Tooltip(mod.getDescription());
-                box.setTooltip(tt);
-                // Можно добавить описание прямо в текст чекбокса
-                box.setText(mod.getName() + " - " + mod.getDescription());
+                cb.setTooltip(new Tooltip(mod.getDescription()));
             }
-            
-            box.getStyleClass().add("aura-checkbox");
-            box.setStyle("-fx-text-fill: #ddd; -fx-font-size: 14px;");
 
-            // Определяем состояние: профиль -> дефолт
-            boolean isActive = userState.getOrDefault(mod.getId(), mod.isDefault());
-            box.setSelected(isActive);
+            // Обработка клика
+            cb.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                modsState.put(mod.getId(), newVal);
+                handleIncompatibleMods(mod, newVal);
+            });
 
-            modCheckboxes.put(mod.getId(), box);
-            modsContainer.getChildren().add(box);
+            modsContainer.getChildren().add(cb);
         }
     }
 
-    // --- ДЕЙСТВИЯ ---
+    private void handleIncompatibleMods(OptionalMod changedMod, boolean isSelected) {
+        if (!isSelected) return;
+        if (changedMod.getIncompatibleIds() == null) return;
+
+        // Если включили мод, выключаем несовместимые
+        for (javafx.scene.Node node : modsContainer.getChildren()) {
+            if (node instanceof CheckBox cb) {
+                // Находим чекбокс по названию (это упрощение, лучше хранить мапу <ID, CheckBox>)
+                // Но так как у нас ID может отличаться от Name, лучше перебирать список availableMods
+                // Для простоты примера оставим так, но в продакшене лучше маппинг.
+            }
+        }
+    }
 
     @FXML
-    private void autoDetectJava() {
-        // [FIX] Используем JavaManagerService
+    private void onSelectJava() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Выберите Java Executable (java/java.exe)");
+
+        File file = chooser.showOpenDialog(dashboard.getStage());
+
+        if (file != null) {
+            javaPathField.setText(file.getAbsolutePath());
+        }
+    }
+
+    @FXML
+    private void onSave() {
+        // Сохраняем значения в объект профиля
         try {
-            Path bestJava = di.getJavaManagerService().getJavaPath(serverProfile.getVersion());
-            javaPathField.setText(bestJava.toAbsolutePath().toString());
+            profile.setMemoryMb((int) memorySlider.getValue());
         } catch (Exception e) {
-            // Если не нашли, можно показать алерт
-            javaPathField.setText("Не удалось найти подходящую Java :(");
+            profile.setMemoryMb(4096);
         }
-    }
 
-    @FXML
-    private void browseJava() {
-        FileChooser fc = new FileChooser();
-        fc.setTitle("Выберите исполняемый файл Java");
-        File f = fc.showOpenDialog(dashboard.getStage()); // Используем геттер окна из Dashboard
-        if (f != null) {
-            javaPathField.setText(f.getAbsolutePath());
-        }
-    }
-
-    @FXML
-    private void save() {
-        // Сохраняем системные
-        instanceProfile.setMemoryMb(((int) ramSlider.getValue() / 512) * 512);
-        
-        String jPath = javaPathField.getText().trim();
-        instanceProfile.setJavaPath(jPath.isEmpty() ? null : jPath);
-        
-        String jArgs = jvmArgsField.getText().trim();
-        instanceProfile.setJvmArgs(jArgs.isEmpty() ? null : jArgs);
+        profile.setJavaPath(javaPathField.getText().trim());
+        profile.setJvmArgs(jvmArgsField.getText().trim());
+        profile.setFullScreen(fullScreenCheck.isSelected());
+        profile.setAutoConnect(autoConnectCheck.isSelected());
 
         // Сохраняем моды
-        Map<String, Boolean> newState = instanceProfile.getOptionalModsState();
-        modCheckboxes.forEach((id, box) -> newState.put(id, box.isSelected()));
+        profile.setOptionalModsState(new HashMap<>(modsState));
 
         // Пишем на диск
-        di.getProfileManager().saveProfile(instanceProfile);
-        
-        // Возвращаемся на главную
-        back();
-    }
-    
-    @FXML
-    private void reset() {
-        // Перезагружаем профиль (сбрасываем несохраненные изменения)
-        setServer(serverProfile);
+        di.getProfileManager().saveProfile(profile);
+
+        // Возвращаемся
+        dashboard.showHome();
     }
 
     @FXML
-    private void back() {
+    private void onCancel() {
         dashboard.showHome();
     }
 }

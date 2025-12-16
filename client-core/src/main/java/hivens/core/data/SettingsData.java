@@ -6,35 +6,39 @@ import lombok.NoArgsConstructor;
 
 import java.io.File;
 
-/**
- * Глобальные настройки лаунчера.
- * (Используем Class вместо Record, чтобы можно было менять поля через сеттеры в UI)
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class SettingsData {
 
     // --- Система ---
-    private String javaPath;         // Путь к Java
-    private int memoryMB = 4096;     // Память (по умолчанию 4GB)
+    private String javaPath;
+    private int memoryMB = 4096;
 
     // --- Визуал ---
-    private String theme = "Warm";   // Тема: "Ice", "Warm", "Dark"
+    private String theme = "Warm";
 
     // --- Поведение ---
     private boolean closeAfterStart = true;
     private boolean saveCredentials = true;
 
-    /**
-     * Создает дефолтные настройки
-     */
+    private String savedUsername;
+    private String savedUuid;
+    private String savedAccessToken;
+    private FileManifest savedFileManifest;
+
     public static SettingsData defaults() {
         SettingsData data = new SettingsData();
-        // Пытаемся угадать системную Java
-        data.setJavaPath(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
+
+        // Определение Java
+        String os = System.getProperty("os.name").toLowerCase();
+        String javaHome = System.getProperty("java.home");
+        String javaBin = javaHome + File.separator + "bin" + File.separator + (os.contains("win") ? "java.exe" : "java");
+
+        data.setJavaPath(javaBin);
         data.setMemoryMB(4096);
         data.setTheme("Warm");
+        data.setSaveCredentials(true);
         return data;
     }
 }

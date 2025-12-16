@@ -36,32 +36,54 @@
     -fx-padding: 0;
 }
 
-/* --- INPUTS --- */
-.aura-input, .text-field, .password-field, .combo-box {
+/* Само поле (закрытое) */
+.combo-box {
     -fx-background-color: rgba(0, 0, 0, 0.3);
-    -fx-text-fill: white;
-    -fx-prompt-text-fill: #888;
     -fx-background-radius: 5;
     -fx-border-color: rgba(255,255,255,0.1);
     -fx-border-radius: 5;
-    -fx-padding: 8 12;
+    -fx-padding: 4 8; /* Чуть меньше отступы */
 }
 
-.aura-input:focused, .text-field:focused, .password-field:focused {
-    -fx-border-color: #00aaff;
-    -fx-background-color: rgba(0, 0, 0, 0.5);
-}
-
-.combo-box .cell, .combo-box .list-cell {
+/* Текст внутри закрытого поля */
+.combo-box .cell {
     -fx-text-fill: white;
     -fx-background-color: transparent;
 }
-.combo-box-popup .list-view {
-    -fx-background-color: #1a1a1a;
-    -fx-border-color: #333;
+
+/* Кнопка со стрелкой */
+.combo-box .arrow-button {
+    -fx-background-color: transparent;
 }
-.combo-box-popup .list-cell:hover {
+.combo-box .arrow {
+    -fx-background-color: #888;
+}
+
+/* --- ВЫПАДАЮЩИЙ СПИСОК (POPUP) --- */
+.combo-box-popup .list-view {
+    -fx-background-color: #1a1a1a; /* Тёмно-серый фон, НЕ прозрачный */
+    -fx-border-color: #333;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.6), 10, 0, 0, 5);
+}
+
+/* Ячейки внутри выпадающего списка */
+.combo-box-popup .list-cell {
+    -fx-text-fill: #ccc;
+    -fx-background-color: transparent;
+    -fx-padding: 8 10;
+}
+
+/* При наведении на пункт списка */
+.combo-box-popup .list-cell:filled:hover {
     -fx-background-color: #00aaff;
+    -fx-text-fill: white;
+    -fx-cursor: hand;
+}
+
+/* Выбранный пункт */
+.combo-box-popup .list-cell:filled:selected {
+    -fx-background-color: rgba(0, 170, 255, 0.2);
+    -fx-text-fill: white;
 }
 
 /* --- LABELS --- */
@@ -171,4 +193,57 @@
 }
 .check-box:selected .box {
     -fx-border-color: #00aaff;
+}
+
+/* --- VECTOR LOGIN STYLES --- */
+
+/* Контейнер поля ввода (обводка и фон) */
+.aura-input-container {
+    -fx-background-color: rgba(0, 0, 0, 0.2);
+    -fx-background-radius: 5;
+    -fx-border-color: rgba(255, 255, 255, 0.1);
+    -fx-border-radius: 5;
+    -fx-padding: 5 10; /* Чуть больше отступа для иконки */
+    -fx-alignment: center-left;
+    -fx-spacing: 5;
+}
+
+/* При фокусе на поле ввода подсвечиваем весь контейнер (опционально через JS/Java, но можно так:) */
+.aura-input-container:hover {
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Прозрачное поле внутри */
+.aura-input-transparent {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 5;
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: #666; /* Темнее промпт */
+    -fx-font-size: 14px;
+}
+.aura-input-transparent:focused {
+    -fx-background-color: transparent;
+}
+
+/* Кнопки окна (закрыть/свернуть) */
+.icon-btn, .icon-btn-danger {
+    -fx-background-color: transparent;
+    -fx-text-fill: rgba(255,255,255,0.5);
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-min-width: 30;
+    -fx-min-height: 30;
+}
+.icon-btn:hover {
+    -fx-text-fill: white;
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-background-radius: 50%;
+}
+.icon-btn-danger:hover {
+    -fx-text-fill: white;
+    -fx-background-color: #ff5555;
+    -fx-background-radius: 50%;
 }

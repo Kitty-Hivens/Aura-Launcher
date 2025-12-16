@@ -1,6 +1,7 @@
 package hivens.ui;
 
 import hivens.core.api.model.ServerProfile;
+import hivens.core.data.AuthStatus;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
 import javafx.application.Application;
@@ -8,6 +9,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -18,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Objects;
 
 public class Main extends Application {
 
@@ -38,45 +41,65 @@ public class Main extends Application {
     public void start(Stage primaryStage) throws IOException {
         this.primaryStage = primaryStage;
 
-        // 1. Настраиваем размеры окна под новый Dashboard (1050x700)
-        primaryStage.setWidth(1050);
-        primaryStage.setHeight(700);
-
-        // 2. Устанавливаем прозрачный стиль (без рамок ОС) и фиксируем размер
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setResizable(false);
         primaryStage.setTitle("Aura Launcher");
 
-        // Настройка неявного выхода (зависит от того, как вы хотите обрабатывать закрытие)
+        try {
+            if (getClass().getResource("/images/favicon.png") != null) {
+                primaryStage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/favicon.png"))));
+            }
+        } catch (Exception ignored) {}
+
         Platform.setImplicitExit(true);
 
-        // 3. Загружаем новый FXML файл (MainDashboard вместо LoginForm)
-        FXMLLoader loader = loadFXML("MainDashboard.fxml");
+        // --- [ВОССТАНОВЛЕННЫЙ БЛОК] ЛОГИКА АВТО-ВХОДА ---
+        SettingsData settings = container.getSettingsService().getSettings();
 
-        // Передаем зависимости (DI контейнер и ссылку на Main) в контроллер
+        // Проверяем наличие токена (пароль нам не нужен)
+        if (settings.isSaveCredentials() && settings.getSavedAccessToken() != null && !settings.getSavedAccessToken().isEmpty()) {
+            log.info("Auto-login: restoring session for {}", settings.getSavedUsername());
+
+            // Восстанавливаем полную сессию, включая манифест файлов
+            SessionData restoredSession = new SessionData(
+                    AuthStatus.OK,
+                    settings.getSavedUsername(),
+                    settings.getSavedUuid(),
+                    settings.getSavedAccessToken(),
+                    settings.getSavedFileManifest()
+            );
+
+            showDashboard(restoredSession);
+        } else {
+            showLoginScene();
+        }
+    }
+
+    /**
+     * Показывает основной дашборд и передает в него сессию
+     */
+    public void showDashboard(SessionData session) throws IOException {
+        primaryStage.setWidth(1050);
+        primaryStage.setHeight(700);
+
+        FXMLLoader loader = loadFXML("MainDashboard.fxml");
         loader.setControllerFactory(clz -> new DashboardController(container, this));
 
         Parent root = loader.load();
 
-        // 4. Создаем сцену с прозрачной заливкой (важно для скругленных углов CSS)
-        Scene scene = new Scene(root);
-        scene.setFill(Color.TRANSPARENT);
+        DashboardController controller = loader.getController();
+        controller.initSession(session);
 
-        // 5. Применяем сохраненную тему пользователя (Warm/Ice/Dark)
-        ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
-
-        // 6. Включаем логику перетаскивания окна мышкой
-        makeDraggable(scene, root);
-
-        // 7. Показываем окно
-        primaryStage.setScene(scene);
-        primaryStage.centerOnScreen(); // Центрируем на мониторе
-        primaryStage.show();
+        applyScene(root);
     }
 
+    /**
+     * Показывает экран входа
+     */
     public void showLoginScene() throws IOException {
         FXMLLoader loader = loadFXML("LoginForm.fxml");
         loader.setControllerFactory(clz -> new LoginController(container, this));
+
         showScene(loader);
     }
 
@@ -102,10 +125,23 @@ public class Main extends Application {
         controller.startProcess(task, thread);
     }
 
+    private void applySceneToStage(Stage stage, Parent root) {
+        Scene scene = new Scene(root);
+        scene.setFill(Color.TRANSPARENT);
+        ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
+        makeDraggable(scene, root);
+        stage.setScene(scene);
+    }
+
+    private void applyScene(Parent root) {
+        applySceneToStage(primaryStage, root);
+        primaryStage.centerOnScreen();
+        if (!primaryStage.isShowing()) primaryStage.show();
+    }
+
     public void showGlobalSettings() {
         try {
             FXMLLoader loader = loadFXML("Settings.fxml");
-            // [FIX] Передаем 'this' (Main), чтобы контроллер мог менять тему главного окна
             loader.setControllerFactory(c -> new SettingsController(container, this));
 
             Stage settingsStage = new Stage();

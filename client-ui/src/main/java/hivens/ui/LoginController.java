@@ -1,25 +1,27 @@
 package hivens.ui;
 
-import hivens.core.api.AuthException;
 import hivens.core.api.model.ServerProfile;
 import hivens.core.data.SessionData;
+import hivens.core.data.SettingsData;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
-import javafx.animation.TranslateTransition;
-import javafx.util.Duration;
+import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.List;
 
 public class LoginController {
+
+    private static final Logger log = LoggerFactory.getLogger(LoginController.class);
 
     private final LauncherDI di;
     private final Main mainApp;
 
     @FXML private TextField loginField;
     @FXML private PasswordField passwordField;
-    @FXML private ComboBox<ServerProfile> serversField;
+    @FXML private CheckBox rememberMeCheck;
     @FXML private Label statusLabel;
     @FXML private Button loginButton;
 
@@ -29,131 +31,140 @@ public class LoginController {
     }
 
     @FXML
-    public void initialize() {
-        // Подгружаем сохраненный логин, если есть (можно добавить в SettingsData)
-        // loginField.setText(di.getSettingsService().getSettings().getLastLogin());
-
-        // Загрузка списка серверов
-        loginButton.setDisable(true);
-        statusLabel.setText("Загрузка серверов...");
-
-        CompletableFuture.runAsync(() -> {
-            try {
-                var profiles = di.getServerListService().fetchProfiles().join();
-                Platform.runLater(() -> {
-                    serversField.getItems().setAll(profiles);
-                    if (!profiles.isEmpty()) {
-                        serversField.getSelectionModel().selectFirst();
-                    }
-                    statusLabel.setText("");
-                    loginButton.setDisable(false);
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    statusLabel.setText("Ошибка загрузки списка серверов");
-                    loginButton.setDisable(false); // Даем возможность попробовать снова или зайти в настройки
-                });
-            }
-        });
-
-        // Горячие клавиши
-        loginField.setOnKeyPressed(e -> { if(e.getCode() == KeyCode.ENTER) passwordField.requestFocus(); });
-        passwordField.setOnKeyPressed(e -> { if(e.getCode() == KeyCode.ENTER) onLogin(); });
+    private void initialize() {
+        SettingsData settings = di.getSettingsService().getSettings();
+        if (settings.getSavedUsername() != null) {
+            loginField.setText(settings.getSavedUsername());
+        }
+        rememberMeCheck.setSelected(settings.isSaveCredentials());
     }
 
     @FXML
     private void onLogin() {
-        String u = loginField.getText().trim();
-        String p = passwordField.getText();
-        ServerProfile server = serversField.getValue();
+        String login = loginField.getText();
+        String pass = passwordField.getText();
 
-        if (u.isEmpty() || p.isEmpty()) {
+        if (login.isEmpty() || pass.isEmpty()) {
             statusLabel.setText("Введите логин и пароль");
-            shake(loginField);
-            return;
-        }
-        if (server == null) {
-            statusLabel.setText("Выберите сервер");
-            shake(serversField);
+            animateError(loginField);
             return;
         }
 
-        setControlsDisabled(true);
-        statusLabel.setText("Авторизация...");
+        setBusy(true);
+        statusLabel.setText("Получение списка серверов...");
 
-        // Запуск в отдельном потоке, чтобы не морозить UI
-        new Thread(() -> {
-            try {
-                // Используем AssetDir как ID сервера для авторизации (стандарт SmartyCraft)
-                String serverId = server.getAssetDir();
+        // 1. Сначала получаем список серверов, чтобы узнать валидный ID
+        di.getServerListService().fetchProfiles().thenAccept(profiles -> {
 
-                SessionData session = di.getAuthService().login(u, p, serverId);
-
+            if (profiles == null || profiles.isEmpty()) {
                 Platform.runLater(() -> {
-                    statusLabel.setText("Успех! Запуск...");
-                    launchGame(session, server);
+                    log.error("Server list is empty or failed to load");
+                    statusLabel.setText("Ошибка: Не удалось получить список серверов");
+                    setBusy(false);
                 });
-
-            } catch (AuthException e) {
-                Platform.runLater(() -> {
-                    // Исправленный switch под ваш AuthStatus.java
-                    String msg = switch (e.getStatus()) {
-                        case BAD_LOGIN -> "Пользователь не найден";      // Исправлено (было WRONG_LOGIN)
-                        case BAD_PASSWORD -> "Неверный пароль";          // Исправлено (было WRONG_PASSWORD)
-                        case SERVER, NO_SERVER -> "Ошибка: Неверный ID сервера";
-                        case INTERNAL_ERROR -> "Внутренняя ошибка сервера";
-                        // BANNED и ACTIVATE_ACCOUNT убраны, так как их нет в AuthStatus
-                        default -> "Ошибка входа: " + e.getStatus();
-                    };
-
-                    statusLabel.setText(msg);
-                    shake(passwordField);
-                    setControlsDisabled(false);
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    statusLabel.setText("Ошибка сети/клиента");
-                    e.printStackTrace();
-                    setControlsDisabled(false);
-                });
+                return;
             }
-        }).start();
+
+            // Берем ID первого сервера (например "HiTech" или "Sandbox")
+            // Это нужно только для получения сессии, сам сервер выберем потом в Дашборде
+            String validServerId = profiles.get(0).getAssetDir();
+            log.info("Using server ID for initial login: {}", validServerId);
+
+            // 2. Теперь выполняем вход с валидным ID
+            performAuth(login, pass, validServerId);
+
+        }).exceptionally(ex -> {
+            Platform.runLater(() -> {
+                log.error("Failed to fetch profiles", ex);
+                statusLabel.setText("Ошибка сети: " + ex.getMessage());
+                setBusy(false);
+            });
+            return null;
+        });
     }
 
-    private void launchGame(SessionData session, ServerProfile server) {
+    private void performAuth(String login, String pass, String serverId) {
+        Platform.runLater(() -> statusLabel.setText("Авторизация..."));
+
         try {
-            mainApp.showProgressScene(session, server);
+            // Выполняем синхронный запрос (внутри фонового потока CompletableFuture это ок,
+            // но лучше обернуть в отдельный task, если fetchProfiles возвращает поток UI.
+            // ServerListService.fetchProfiles возвращает future из supplyAsync, так что мы в воркере.
+
+            SessionData session = di.getAuthService().login(login, pass, serverId);
+
+            Platform.runLater(() -> {
+                log.info("Login successful for user: {}", session.playerName());
+                saveCredentials(session);
+                openDashboard(session);
+            });
+
         } catch (Exception e) {
-            statusLabel.setText("Не удалось инициализировать запуск");
-            e.printStackTrace();
-            setControlsDisabled(false);
+            Platform.runLater(() -> {
+                log.error("Auth failed", e);
+                // Показываем красивое сообщение ошибки (например "Неверный пароль")
+                statusLabel.setText(translateError(e.getMessage()));
+                setBusy(false);
+                animateError(statusLabel);
+            });
         }
     }
 
-    @FXML
-    private void onSettings() {
-        // Вызываем метод открытия глобальных настроек (нужно добавить в Main)
-        mainApp.showGlobalSettings();
+    private String translateError(String error) {
+        if (error.contains("BAD_LOGIN")) return "Пользователь не найден";
+        if (error.contains("BAD_PASSWORD")) return "Неверный пароль";
+        if (error.contains("SERVER")) return "Ошибка сервера (ID)";
+        return "Ошибка: " + error;
     }
 
-    @FXML
-    private void onClose() {
-        Platform.exit();
-        System.exit(0);
+    private void saveCredentials(SessionData session) {
+        SettingsData settings = di.getSettingsService().getSettings();
+        boolean save = rememberMeCheck.isSelected();
+
+        settings.setSaveCredentials(save);
+        if (save) {
+            settings.setSavedUsername(session.playerName());
+            settings.setSavedUuid(session.uuid());
+            settings.setSavedAccessToken(session.accessToken());
+            settings.setSavedFileManifest(session.fileManifest());
+        } else {
+            settings.setSavedAccessToken(null);
+            settings.setSavedFileManifest(null);
+        }
+        di.getSettingsService().saveSettings(settings);
     }
 
-    private void setControlsDisabled(boolean disabled) {
-        loginField.setDisable(disabled);
-        passwordField.setDisable(disabled);
-        serversField.setDisable(disabled);
-        loginButton.setDisable(disabled);
+    private void openDashboard(SessionData session) {
+        try {
+            mainApp.showDashboard(session);
+        } catch (Exception e) {
+            log.error("Failed to show dashboard", e);
+            statusLabel.setText("Critical Error: UI Switch Failed");
+        }
     }
 
-    private void shake(javafx.scene.Node node) {
-        TranslateTransition tt = new TranslateTransition(Duration.millis(50), node);
-        tt.setFromX(0); tt.setByX(5);
-        tt.setCycleCount(6);
+    private void setBusy(boolean busy) {
+        loginButton.setDisable(busy);
+        loginField.setDisable(busy);
+        passwordField.setDisable(busy);
+    }
+
+    private void animateError(javafx.scene.Node node) {
+        javafx.animation.TranslateTransition tt = new javafx.animation.TranslateTransition(javafx.util.Duration.millis(50), node);
+        tt.setFromX(0);
+        tt.setByX(10);
+        tt.setCycleCount(4);
         tt.setAutoReverse(true);
         tt.play();
+    }
+
+    @FXML private void onMinimize() {
+        Stage stage = (Stage) loginButton.getScene().getWindow();
+        stage.setIconified(true);
+    }
+
+    @FXML private void onExit() {
+        Platform.exit();
+        System.exit(0);
     }
 }
