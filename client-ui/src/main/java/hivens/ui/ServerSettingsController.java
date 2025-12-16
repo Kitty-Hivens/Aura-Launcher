@@ -1,20 +1,25 @@
 package hivens.ui;
 
+import hivens.core.api.model.ServerProfile;
 import hivens.core.data.InstanceProfile;
 import hivens.core.data.OptionalMod;
-import hivens.launcher.ProfileManager;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
-import javafx.stage.DirectoryChooser;
-import javafx.stage.Stage;
+import javafx.stage.FileChooser;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class ServerSettingsController {
+
+    private final LauncherDI di;
+    private final DashboardController dashboard;
+    private ServerProfile serverProfile;
+    private InstanceProfile instanceProfile;
 
     @FXML private Label titleLabel;
     @FXML private Slider ramSlider;
@@ -23,37 +28,39 @@ public class ServerSettingsController {
     @FXML private TextField jvmArgsField;
     @FXML private VBox modsContainer;
 
-    private InstanceProfile profile;
-    private ProfileManager profileManager;
-    private Stage stage;
-
-    // Храним ссылки на чекбоксы для сохранения
     private final Map<String, CheckBox> modCheckboxes = new HashMap<>();
 
-    public void setup(InstanceProfile profile, ProfileManager manager, List<OptionalMod> mods, Stage stage) {
-        this.profile = profile;
-        this.profileManager = manager;
-        this.stage = stage;
+    public ServerSettingsController(LauncherDI di, DashboardController dashboard) {
+        this.di = di;
+        this.dashboard = dashboard;
+    }
 
-        if (profile != null) {
-            titleLabel.setText("НАСТРОЙКИ: " + profile.getServerId().toUpperCase());
+    public void setServer(ServerProfile server) {
+        this.serverProfile = server;
+        this.titleLabel.setText("НАСТРОЙКИ: " + server.getName().toUpperCase());
 
-            // Память
-            int ram = (profile.getMemoryMb() != null && profile.getMemoryMb() > 0) ? profile.getMemoryMb() : 4096;
-            ramSlider.setValue(ram);
-            ramValueLabel.setText(ram + " MB");
+        // Загружаем профиль игрока (локальные настройки)
+        this.instanceProfile = di.getProfileManager().getProfile(server.getAssetDir());
 
-            // Java и аргументы
-            javaPathField.setText(profile.getJavaPath() != null ? profile.getJavaPath() : "");
-            jvmArgsField.setText(profile.getJvmArgs() != null ? profile.getJvmArgs() : "");
+        // 1. Настраиваем UI системы
+        int ram = (instanceProfile.getMemoryMb() != null && instanceProfile.getMemoryMb() > 0) 
+                  ? instanceProfile.getMemoryMb() : 4096;
+        ramSlider.setValue(ram);
+        ramValueLabel.setText(ram + " MB");
 
-            buildModsList(mods);
-        }
+        javaPathField.setText(instanceProfile.getJavaPath() != null ? instanceProfile.getJavaPath() : "");
+        jvmArgsField.setText(instanceProfile.getJvmArgs() != null ? instanceProfile.getJvmArgs() : "");
+
+        // 2. Настраиваем список модов
+        // Получаем СПИСОК ДОСТУПНЫХ модов из манифеста (ManifestProcessor)
+        List<OptionalMod> availableMods = di.getManifestProcessorService()
+                .getOptionalModsForClient(server.getVersion());
+        
+        buildModsList(availableMods);
     }
 
     @FXML
     public void initialize() {
-        // Обновление лейбла при движении слайдера
         ramSlider.valueProperty().addListener((obs, old, val) -> {
             // Округляем до 512
             int value = (val.intValue() / 512) * 512;
@@ -64,85 +71,94 @@ public class ServerSettingsController {
     private void buildModsList(List<OptionalMod> mods) {
         modsContainer.getChildren().clear();
         modCheckboxes.clear();
-
-        // Получаем текущее состояние модов из профиля
-        Map<String, Boolean> userState = profile.getOptionalModsState();
+        
+        // Текущее состояние (что игрок выбрал ранее)
+        Map<String, Boolean> userState = instanceProfile.getOptionalModsState();
 
         if (mods.isEmpty()) {
-            Label placeholder = new Label("Для этого сервера нет опциональных модов.");
+            Label placeholder = new Label("Нет доступных опциональных модов для этой версии.");
             placeholder.setStyle("-fx-text-fill: #888;");
             modsContainer.getChildren().add(placeholder);
             return;
         }
 
         for (OptionalMod mod : mods) {
-            CheckBox box = new CheckBox(mod.getName() + " (" + mod.getDescription() + ")");
-            box.setWrapText(true);
-            box.setStyle("-fx-text-fill: #ddd; -fx-font-size: 13px; -fx-padding: 5;");
+            CheckBox box = new CheckBox(mod.getName());
+            
+            // Если есть описание, добавляем Tooltip
+            if (mod.getDescription() != null && !mod.getDescription().isEmpty()) {
+                Tooltip tt = new Tooltip(mod.getDescription());
+                box.setTooltip(tt);
+                // Можно добавить описание прямо в текст чекбокса
+                box.setText(mod.getName() + " - " + mod.getDescription());
+            }
+            
+            box.getStyleClass().add("aura-checkbox");
+            box.setStyle("-fx-text-fill: #ddd; -fx-font-size: 14px;");
 
-            // Определяем состояние: если в профиле нет записи, берем дефолтное значение мода
+            // Определяем состояние: профиль -> дефолт
             boolean isActive = userState.getOrDefault(mod.getId(), mod.isDefault());
             box.setSelected(isActive);
-
-            // Если мод обязательный (например), можно задизейблить чекбокс
-            // if (mod.isForced()) box.setDisable(true);
 
             modCheckboxes.put(mod.getId(), box);
             modsContainer.getChildren().add(box);
         }
     }
 
+    // --- ДЕЙСТВИЯ ---
+
     @FXML
-    private void save() {
-        if (profile != null) {
-            // 1. Сохраняем системные настройки
-            // Округляем RAM
-            int ram = (int) ramSlider.getValue();
-            ram = (ram / 512) * 512;
-
-            profile.setMemoryMb(ram);
-
-            String javaPath = javaPathField.getText().trim();
-            profile.setJavaPath(javaPath.isEmpty() ? null : javaPath);
-
-            String jvmArgs = jvmArgsField.getText().trim();
-            profile.setJvmArgs(jvmArgs.isEmpty() ? null : jvmArgs);
-
-            // 2. Сохраняем состояние модов
-            Map<String, Boolean> newState = profile.getOptionalModsState();
-            modCheckboxes.forEach((modId, box) -> newState.put(modId, box.isSelected()));
-
-            // 3. Пишем на диск
-            profileManager.saveProfile(profile);
+    private void autoDetectJava() {
+        // [FIX] Используем JavaManagerService
+        try {
+            Path bestJava = di.getJavaManagerService().getJavaPath(serverProfile.getVersion());
+            javaPathField.setText(bestJava.toAbsolutePath().toString());
+        } catch (Exception e) {
+            // Если не нашли, можно показать алерт
+            javaPathField.setText("Не удалось найти подходящую Java :(");
         }
-        close();
-    }
-
-    @FXML
-    private void close() {
-        if (stage != null) stage.close();
     }
 
     @FXML
     private void browseJava() {
-        DirectoryChooser dc = new DirectoryChooser();
-        dc.setTitle("Выберите папку с Java (JDK/JRE)");
-        File f = dc.showDialog(stage);
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Выберите исполняемый файл Java");
+        File f = fc.showOpenDialog(dashboard.getStage()); // Используем геттер окна из Dashboard
         if (f != null) {
-            // Пытаемся угадать путь к бинарнику
-            File binJava = new File(f, "bin/java.exe"); // Windows
-            if (!binJava.exists()) binJava = new File(f, "bin/java"); // Unix
-
-            if (binJava.exists()) {
-                javaPathField.setText(binJava.getAbsolutePath());
-            } else {
-                // Если выбрали саму папку bin или файл java
-                if (f.getName().equals("java") || f.getName().equals("java.exe")) {
-                    javaPathField.setText(f.getAbsolutePath());
-                } else {
-                    javaPathField.setText(f.getAbsolutePath()); // Просто путь, пусть LauncherService разбирается
-                }
-            }
+            javaPathField.setText(f.getAbsolutePath());
         }
+    }
+
+    @FXML
+    private void save() {
+        // Сохраняем системные
+        instanceProfile.setMemoryMb(((int) ramSlider.getValue() / 512) * 512);
+        
+        String jPath = javaPathField.getText().trim();
+        instanceProfile.setJavaPath(jPath.isEmpty() ? null : jPath);
+        
+        String jArgs = jvmArgsField.getText().trim();
+        instanceProfile.setJvmArgs(jArgs.isEmpty() ? null : jArgs);
+
+        // Сохраняем моды
+        Map<String, Boolean> newState = instanceProfile.getOptionalModsState();
+        modCheckboxes.forEach((id, box) -> newState.put(id, box.isSelected()));
+
+        // Пишем на диск
+        di.getProfileManager().saveProfile(instanceProfile);
+        
+        // Возвращаемся на главную
+        back();
+    }
+    
+    @FXML
+    private void reset() {
+        // Перезагружаем профиль (сбрасываем несохраненные изменения)
+        setServer(serverProfile);
+    }
+
+    @FXML
+    private void back() {
+        dashboard.showHome();
     }
 }

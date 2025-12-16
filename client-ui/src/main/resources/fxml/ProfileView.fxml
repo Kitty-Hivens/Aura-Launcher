@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox spacing="20" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" style="-fx-padding: 20;">
+    <Label text="ПРОФИЛЬ ИГРОКА" styleClass="label-title"/>
+    <VBox styleClass="glass-pane" style="-fx-padding: 20;">
+        <Label text="Здесь будет информация о скине и плаще." styleClass="label-subtitle"/>
+    </VBox>
+</VBox>

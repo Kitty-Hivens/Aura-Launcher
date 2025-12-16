@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<VBox spacing="20" style="-fx-padding: 20;" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
+
+    <HBox alignment="CENTER_LEFT" spacing="15">
+        <Button text="&lt; НАЗАД" onAction="#back" styleClass="icon-btn"/>
+        <Label fx:id="titleLabel" text="НАСТРОЙКИ СЕРВЕРА" styleClass="label-title"/>
+    </HBox>
+
+    <TabPane tabClosingPolicy="UNAVAILABLE" styleClass="aura-tabs" VBox.vgrow="ALWAYS">
+
+        <Tab text="СИСТЕМА">
+            <VBox spacing="25" styleClass="glass-pane" style="-fx-padding: 30;">
+
+                <VBox spacing="10">
+                    <HBox alignment="CENTER_LEFT" spacing="10">
+                        <Label text="Выделенная память:" styleClass="setting-label"/>
+                        <Label fx:id="ramValueLabel" text="4096 MB" style="-fx-text-fill: #00c6ff; -fx-font-weight: bold;"/>
+                    </HBox>
+                    <Slider fx:id="ramSlider" min="1024" max="16384" blockIncrement="512" majorTickUnit="2048" showTickMarks="true" snapToTicks="true"/>
+                </VBox>
+
+                <VBox spacing="10">
+                    <Label text="Путь к Java:" styleClass="setting-label"/>
+                    <HBox spacing="10">
+                        <TextField fx:id="javaPathField" promptText="Оставьте пустым для авто-выбора" HBox.hgrow="ALWAYS" styleClass="aura-input"/>
+                        <Button text="Обзор..." onAction="#browseJava" styleClass="icon-btn"/>
+                    </HBox>
+                    <Button text="Авто-подбор (JavaManager)" onAction="#autoDetectJava" styleClass="aura-btn-secondary" maxWidth="Infinity"/>
+                </VBox>
+
+                <VBox spacing="10">
+                    <Label text="Аргументы запуска (JVM Flags):" styleClass="setting-label"/>
+                    <TextField fx:id="jvmArgsField" promptText="Например: -XX:+UseZGC" styleClass="aura-input"/>
+                </VBox>
+
+            </VBox>
+        </Tab>
+
+        <Tab text="МОДЫ">
+            <VBox styleClass="glass-pane" style="-fx-padding: 0;">
+                <ScrollPane fitToWidth="true" style="-fx-background-color: transparent; -fx-background: transparent;" VBox.vgrow="ALWAYS">
+                    <VBox fx:id="modsContainer" spacing="10" style="-fx-padding: 20;">
+                    </VBox>
+                </ScrollPane>
+            </VBox>
+        </Tab>
+
+    </TabPane>
+
+    <HBox alignment="CENTER_RIGHT" spacing="15">
+        <Button text="СБРОСИТЬ" onAction="#reset" styleClass="aura-btn-secondary"/>
+        <Button text="СОХРАНИТЬ" onAction="#save" styleClass="aura-btn-primary"/>
+    </HBox>
+
+</VBox>

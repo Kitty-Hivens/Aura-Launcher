@@ -1,0 +1,146 @@
+.root {
+    -fx-font-family: "Open Sans";
+    -fx-text-fill: white;
+}
+
+/* Эффект стекла для панелей */
+.glass-pane {
+    -fx-background-color: rgba(20, 20, 30, 0.65); /* Полупрозрачный черный */
+    -fx-background-radius: 20;
+    -fx-border-color: rgba(255, 255, 255, 0.1);
+    -fx-border-radius: 20;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 20, 0, 0, 0);
+}
+
+/* Логотип */
+.logo-text {
+    -fx-font-size: 36px;
+    -fx-font-weight: 900;
+    -fx-text-fill: linear-gradient(to right, #00c6ff, #0072ff);
+}
+.logo-subtext {
+    -fx-font-size: 12px;
+    -fx-text-fill: #aaa;
+    -fx-letter-spacing: 2px;
+}
+
+/* Меню кнопки */
+.menu-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #ccc;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-alignment: CENTER_LEFT;
+    -fx-padding: 12 20;
+    -fx-cursor: hand;
+    -fx-background-radius: 10;
+}
+.menu-btn:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-text-fill: white;
+}
+/* Активная кнопка */
+.menu-btn.active {
+    -fx-background-color: linear-gradient(to right, rgba(0, 198, 255, 0.2), transparent);
+    -fx-text-fill: #00c6ff;
+    -fx-border-color: transparent transparent transparent #00c6ff;
+    -fx-border-width: 0 0 0 3;
+}
+
+/* Кнопка ИГРАТЬ */
+.play-btn {
+    -fx-background-color: linear-gradient(to right, #00c6ff, #0072ff);
+    -fx-text-fill: white;
+    -fx-font-size: 18px;
+    -fx-font-weight: 800;
+    -fx-padding: 15 60;
+    -fx-background-radius: 30;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 114, 255, 0.6), 15, 0.3, 0, 4);
+    -fx-transition: all 0.3s;
+}
+.play-btn:hover {
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+    -fx-background-color: linear-gradient(to right, #00d2ff, #0088ff);
+}
+.play-btn:pressed {
+    -fx-scale-x: 0.95;
+    -fx-scale-y: 0.95;
+}
+
+/* Карточка пользователя */
+.user-card {
+    -fx-background-color: rgba(0,0,0,0.3);
+    -fx-background-radius: 15;
+    -fx-padding: 10;
+}
+.user-name { -fx-font-weight: bold; -fx-font-size: 14px; }
+.user-status { -fx-text-fill: #00ff88; -fx-font-size: 11px; }
+
+/* Кнопки окна */
+.window-btn {
+    -fx-background-color: rgba(0,0,0,0.3);
+    -fx-text-fill: white;
+    -fx-background-radius: 50%;
+    -fx-min-width: 30px;
+    -fx-min-height: 30px;
+    -fx-cursor: hand;
+}
+.window-btn:hover { -fx-background-color: rgba(255,255,255,0.2); }
+.close-btn:hover { -fx-background-color: #ff4444; }
+
+/* --- СПИСОК СЕРВЕРОВ (Server List) --- */
+
+.list-view {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+.list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 5;
+    -fx-text-fill: white;
+}
+
+/* Стиль карточки сервера */
+.server-card {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-background-radius: 10;
+    -fx-border-color: rgba(255, 255, 255, 0.1);
+    -fx-border-radius: 10;
+    -fx-padding: 15;
+    -fx-cursor: hand;
+    -fx-transition: all 0.2s;
+}
+
+/* При наведении */
+.server-card:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Выбранный сервер (Активный) */
+.list-cell:selected .server-card {
+    -fx-background-color: rgba(0, 198, 255, 0.15); /* Голубая подсветка */
+    -fx-border-color: #00c6ff;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 198, 255, 0.4), 10, 0, 0, 0);
+}
+
+.server-name {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+.server-desc {
+    -fx-font-size: 12px;
+    -fx-text-fill: #aaa;
+}
+.server-version {
+    -fx-font-size: 11px;
+    -fx-text-fill: #00c6ff;
+    -fx-font-weight: bold;
+    -fx-background-color: rgba(0, 198, 255, 0.1);
+    -fx-background-radius: 5;
+    -fx-padding: 2 6;
+}

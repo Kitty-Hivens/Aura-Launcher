@@ -1,8 +1,6 @@
 package hivens.ui;
 
 import hivens.core.api.model.ServerProfile;
-import hivens.core.data.InstanceProfile;
-import hivens.core.data.OptionalMod;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
 import javafx.application.Application;
@@ -14,17 +12,19 @@ import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.List;
 
 public class Main extends Application {
 
     private static final Logger log = LoggerFactory.getLogger(Main.class);
     private LauncherDI container;
+    // [NEW] Геттер для доступа к главному окну из контроллеров
+    @Getter
     private Stage primaryStage;
     private double xOffset = 0;
     private double yOffset = 0;
@@ -38,18 +38,40 @@ public class Main extends Application {
     public void start(Stage primaryStage) throws IOException {
         this.primaryStage = primaryStage;
 
+        // 1. Настраиваем размеры окна под новый Dashboard (1050x700)
+        primaryStage.setWidth(1050);
+        primaryStage.setHeight(700);
+
+        // 2. Устанавливаем прозрачный стиль (без рамок ОС) и фиксируем размер
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setResizable(false);
         primaryStage.setTitle("Aura Launcher");
 
+        // Настройка неявного выхода (зависит от того, как вы хотите обрабатывать закрытие)
         Platform.setImplicitExit(true);
 
-        showLoginScene();
-    }
+        // 3. Загружаем новый FXML файл (MainDashboard вместо LoginForm)
+        FXMLLoader loader = loadFXML("MainDashboard.fxml");
 
-    // [NEW] Геттер для доступа к главному окну из контроллеров
-    public Stage getPrimaryStage() {
-        return primaryStage;
+        // Передаем зависимости (DI контейнер и ссылку на Main) в контроллер
+        loader.setControllerFactory(clz -> new DashboardController(container, this));
+
+        Parent root = loader.load();
+
+        // 4. Создаем сцену с прозрачной заливкой (важно для скругленных углов CSS)
+        Scene scene = new Scene(root);
+        scene.setFill(Color.TRANSPARENT);
+
+        // 5. Применяем сохраненную тему пользователя (Warm/Ice/Dark)
+        ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
+
+        // 6. Включаем логику перетаскивания окна мышкой
+        makeDraggable(scene, root);
+
+        // 7. Показываем окно
+        primaryStage.setScene(scene);
+        primaryStage.centerOnScreen(); // Центрируем на мониторе
+        primaryStage.show();
     }
 
     public void showLoginScene() throws IOException {
@@ -107,38 +129,6 @@ public class Main extends Application {
 
         } catch (IOException e) {
             log.error("Failed to show global settings", e);
-        }
-    }
-
-    public void showServerSettings(ServerProfile server) {
-        try {
-            FXMLLoader loader = loadFXML("ServerSettings.fxml");
-            ServerSettingsController controller = new ServerSettingsController();
-            loader.setController(controller);
-
-            Stage settingsStage = new Stage();
-            settingsStage.initOwner(primaryStage);
-            settingsStage.initModality(Modality.WINDOW_MODAL);
-            settingsStage.initStyle(StageStyle.TRANSPARENT);
-            settingsStage.setResizable(false);
-
-            Parent root = loader.load();
-            Scene scene = new Scene(root);
-            scene.setFill(Color.TRANSPARENT);
-            ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
-            makeDraggable(scene, root);
-
-            settingsStage.setScene(scene);
-
-            InstanceProfile profile = container.getProfileManager().getProfile(server.getAssetDir());
-            List<OptionalMod> mods = container.getManifestProcessorService()
-                    .getOptionalModsForClient(server.getVersion());
-
-            controller.setup(profile, container.getProfileManager(), mods, settingsStage);
-
-            settingsStage.showAndWait();
-        } catch (IOException e) {
-            log.error("Failed to show server settings", e);
         }
     }
 

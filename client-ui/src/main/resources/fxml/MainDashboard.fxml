@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.media.MediaView?>
+<?import javafx.scene.shape.Rectangle?>
+
+<StackPane fx:id="root" prefHeight="700.0" prefWidth="1050.0" stylesheets="@aura-dashboard.css"
+           xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="hivens.ui.DashboardController">
+
+    <MediaView fx:id="bgVideoView" fitHeight="720.0" fitWidth="1080.0" preserveRatio="false"/>
+
+    <Rectangle fx:id="overlay" height="720.0" width="1080.0" fill="#000000" opacity="0.6"/>
+
+    <BorderPane style="-fx-padding: 30;">
+
+        <left>
+            <VBox spacing="15" style="-fx-padding: 20; -fx-min-width: 220;" styleClass="glass-pane">
+                <VBox alignment="CENTER" spacing="5" style="-fx-padding: 0 0 30 0;">
+                    <Label text="AURA" styleClass="logo-text"/>
+                    <Label text="LAUNCHER" styleClass="logo-subtext"/>
+                </VBox>
+
+                <Button fx:id="homeBtn" text="ГЛАВНАЯ" onAction="#showHome" styleClass="menu-btn, active"/>
+                <Button fx:id="profileBtn" text="ПРОФИЛЬ" onAction="#showProfile" styleClass="menu-btn"/>
+                <Button fx:id="settingsBtn" text="НАСТРОЙКИ" onAction="#showSettings" styleClass="menu-btn"/>
+
+                <VBox VBox.vgrow="ALWAYS"/> <HBox spacing="10" alignment="CENTER_LEFT" styleClass="user-card">
+                <ImageView fx:id="avatarView" fitHeight="32" fitWidth="32"/>
+                <VBox>
+                    <Label fx:id="usernameLabel" text="Steve" styleClass="user-name"/>
+                    <Label text="Online" styleClass="user-status"/>
+                </VBox>
+            </HBox>
+            </VBox>
+        </left>
+
+        <center>
+            <StackPane fx:id="contentArea" style="-fx-padding: 0 0 0 30;">
+            </StackPane>
+        </center>
+
+        <bottom>
+            <HBox alignment="CENTER_RIGHT" spacing="20" style="-fx-padding: 20 0 0 0;">
+                <VBox alignment="CENTER_RIGHT" HBox.hgrow="ALWAYS">
+                    <Label fx:id="statusLabel" text="Готов к запуску" styleClass="status-text"/>
+                    <ProgressBar fx:id="progressBar" progress="0.0" prefWidth="300" visible="false"/>
+                </VBox>
+                <Button fx:id="playButton" text="ИГРАТЬ" onAction="#onPlay" styleClass="play-btn"/>
+            </HBox>
+        </bottom>
+
+    </BorderPane>
+
+    <HBox alignment="TOP_RIGHT" spacing="10" style="-fx-padding: 15;" pickOnBounds="false">
+        <Button text="_" onAction="#minimize" styleClass="window-btn"/>
+        <Button text="X" onAction="#close" styleClass="window-btn, close-btn"/>
+    </HBox>
+
+</StackPane>

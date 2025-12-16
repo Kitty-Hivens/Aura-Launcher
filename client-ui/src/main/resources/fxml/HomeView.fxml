@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox spacing="20" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="hivens.ui.HomeController" style="-fx-padding: 20;">
+
+    <Label text="ВЫБОР СЕРВЕРА" styleClass="label-title"/>
+
+    <Label text="Доступные миры:" styleClass="label-subtitle"/>
+
+    <ListView fx:id="serverListView" VBox.vgrow="ALWAYS" styleClass="glass-pane" style="-fx-background-color: transparent;"/>
+
+</VBox>

@@ -294,13 +294,20 @@ public class LauncherService implements ILauncherService {
         }
     }
 
+    /**
+     * "Хирург": Удаляет выключенные моды и конфликтующие файлы перед запуском.
+     */
     private void syncMods(Path clientRoot, InstanceProfile profile, List<OptionalMod> allMods) throws IOException {
         Path modsDir = clientRoot.resolve("mods");
         if (!Files.exists(modsDir)) Files.createDirectories(modsDir);
+
+        // Загружаем выбор игрока (true/false)
         Map<String, Boolean> state = profile.getOptionalModsState();
 
         for (OptionalMod mod : allMods) {
+            // Если игрок не выбирал, берем дефолтное значение
             boolean isEnabled = state.getOrDefault(mod.getId(), mod.isDefault());
+
             if (isEnabled) {
                 if (mod.getExcludings() != null) {
                     for (String exclude : mod.getExcludings()) {
