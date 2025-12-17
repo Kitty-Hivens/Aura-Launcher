@@ -11,6 +11,7 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation("club.minnced:java-discord-rpc:2.0.2")
 }
 
 javafx {
