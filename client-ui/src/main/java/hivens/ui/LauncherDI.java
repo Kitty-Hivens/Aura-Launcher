@@ -31,6 +31,7 @@ public class LauncherDI {
     private final ISettingsService settingsService;
     private final ProfileManager profileManager;
     private final JavaManagerService javaManagerService;
+    private final CredentialsManager credentialsManager;
 
     public LauncherDI() {
         String userHome = System.getProperty("user.home");
@@ -54,9 +55,10 @@ public class LauncherDI {
         this.authService = new AuthService(httpClient, gson);
         this.integrityService = new FileIntegrityService();
         this.downloadService = new FileDownloadService(httpClient, gson);
-        this.manifestProcessorService = new ManifestProcessorService();
+        this.manifestProcessorService = new ManifestProcessorService(gson);
         this.serverListService = new ServerListService();
         this.settingsService = new SettingsService(gson, dataDirectory.resolve("settings.json"));
+        this.credentialsManager = new CredentialsManager(dataDirectory, gson);
 
         // --- ИНИЦИАЛИЗАЦИЯ НОВЫХ МОДУЛЕЙ ---
         
@@ -66,11 +68,12 @@ public class LauncherDI {
         // 2. Менеджер Java (Скачивание JDK)
         this.javaManagerService = new JavaManagerService(dataDirectory, httpClient);
 
-        // 3. Лаунчер Сервис (теперь принимает ВСЕ зависимости)
+        // 3. Лаунчер Сервис
         this.launcherService = new LauncherService(
             manifestProcessorService, 
             profileManager, 
             javaManagerService
         );
     }
+
 }

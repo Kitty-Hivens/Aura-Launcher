@@ -21,11 +21,4 @@ public interface IFileDownloadService {
      */
     void downloadFile(String relativePath, Path destinationPath) throws IOException;
 
-    /**
-     * Загружает все файлы из предоставленной карты (обычно из IFileIntegrityService).
-     * Реализация должна обеспечивать создание всех необходимых директорий.
-     * @return Количество успешно загруженных файлов.
-     * @throws IOException в случае, если один из файлов не удалось загрузить (может быть заменено на сбор ошибок).
-     */
-    int downloadMissingFiles(Path basePath, String serverId, Map<String, String> filesToDownload, Consumer<String> messageUI, BiConsumer<Integer, Integer> progressUI) throws IOException;
 }

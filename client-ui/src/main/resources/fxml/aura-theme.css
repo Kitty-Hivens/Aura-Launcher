@@ -247,3 +247,43 @@
     -fx-background-color: #ff5555;
     -fx-background-radius: 50%;
 }
+
+.settings-card Label,
+.settings-card .label,
+.settings-card .check-box {
+    -fx-text-fill: white; /* Или #e0e0e0 */
+}
+
+.settings-card .h2 {
+    -fx-text-fill: -fx-accent-color; /* Цвет заголовка */
+    -fx-font-weight: bold;
+}
+
+.settings-card .button-outlined {
+    -fx-text-fill: white;
+    -fx-border-color: rgba(255,255,255,0.3);
+}
+
+/* Скролл модов */
+.mods-scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+.mods-scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+/* Чекбоксы модов */
+.mod-checkbox {
+    -fx-text-fill: -fx-text-base-color;
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+}
+.mod-checkbox:selected .box {
+    -fx-background-color: -fx-accent-color;
+}
+
+/* Опасная кнопка */
+.button-danger:hover {
+    -fx-background-color: rgba(255, 107, 107, 0.1);
+}

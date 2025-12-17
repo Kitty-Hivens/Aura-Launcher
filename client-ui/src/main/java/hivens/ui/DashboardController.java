@@ -253,6 +253,11 @@ public class DashboardController {
     public void setSelectedServer(ServerProfile server) {
         this.selectedServer = server;
         if (statusLabel != null) {
+            // [FIX] Если свойство привязано к задаче, отвязываем его перед изменением
+            if (statusLabel.textProperty().isBound()) {
+                statusLabel.textProperty().unbind();
+            }
+
             String serverName = (server != null) ? server.getName() : "";
             statusLabel.setText(server != null ? "Выбран: " + serverName : "Выберите сервер");
         }

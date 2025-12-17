@@ -50,12 +50,14 @@ public class ServerListService implements IServerListService {
     private static ServerProfile getProfile(SmartyServer srv) {
         ServerProfile profile = new ServerProfile();
         profile.setName(srv.name);
-        // Убрали версию из Title, чтобы не дублировать
         profile.setTitle(srv.name);
         profile.setVersion(srv.version);
         profile.setIp(srv.address);
         profile.setPort(srv.port);
         profile.setAssetDir(srv.name);
+        profile.setExtraCheckSum(srv.extraCheckSum);
+        profile.setOptionalModsData(srv.optionalMods);
+
         return profile;
     }
 }

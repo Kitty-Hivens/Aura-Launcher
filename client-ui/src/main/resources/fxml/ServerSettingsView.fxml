@@ -1,66 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.String?>
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Separator?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.shape.SVGPath?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<StackPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+           style="-fx-background-color: rgba(0, 0, 0, 0.6);"> <VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="400.0" minWidth="500.0" prefHeight="500.0" prefWidth="600.0" spacing="0" styleClass="settings-card">
 
-<VBox alignment="CENTER" style="-fx-background-color: rgba(0,0,0,0.5);" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
+    <HBox alignment="CENTER_LEFT" spacing="15" style="-fx-padding: 20; -fx-border-color: transparent transparent rgba(255,255,255,0.1) transparent;">
+        <Label fx:id="serverTitleLabel" styleClass="h2" text="НАСТРОЙКИ СЕРВЕРА" />
+        <Region HBox.hgrow="ALWAYS" />
+        <Button onAction="#onClose" styleClass="icon-button, close-button" text="✕" />
+    </HBox>
 
-    <VBox maxWidth="400" spacing="20" styleClass="glass-pane">
-        <padding>
-            <Insets bottom="30" left="30" right="30" top="30" />
-        </padding>
+    <VBox spacing="10" VBox.vgrow="ALWAYS" style="-fx-padding: 20;">
+        <Label text="Менеджер модификаций" style="-fx-text-fill: -fx-text-base-color; -fx-opacity: 0.7; -fx-font-size: 14px;" />
 
-        <HBox alignment="CENTER_LEFT" spacing="10">
-            <VBox>
-                <Label styleClass="label-subtitle" text="НАСТРОЙКИ СЕРВЕРА" />
-                <Label fx:id="serverTitleLabel" styleClass="label-header" text="Industrial" />
-            </VBox>
-            <Separator opacity="0" HBox.hgrow="ALWAYS" />
-            <Button onAction="#onClose" styleClass="icon-btn" text="✕" />
-        </HBox>
-
-        <Separator opacity="0.1" />
-
-        <VBox spacing="15">
-            <Label styleClass="label-small" text="УПРАВЛЕНИЕ КЛИЕНТОМ" />
-
-            <Button maxWidth="Infinity" onAction="#onOpenFolder" text="ОТКРЫТЬ ПАПКУ С ИГРОЙ">
-                <styleClass>
-                    <String fx:value="aura-btn" />
-                </styleClass>
-                <graphic>
-                    <SVGPath content="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z" fill="#aaaaaa" scaleX="0.8" scaleY="0.8"/>
-                </graphic>
-            </Button>
-
-            <Button maxWidth="Infinity" onAction="#onReinstall" text="ПЕРЕУСТАНОВИТЬ КЛИЕНТ">
-                <styleClass>
-                    <String fx:value="aura-btn" />
-                </styleClass>
-                <style>
-                    -fx-background-color: rgba(255, 85, 85, 0.1);
-                    -fx-text-fill: #ff5555;
-                    -fx-border-color: rgba(255, 85, 85, 0.3);
-                </style>
-                <graphic>
-                    <SVGPath content="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z" fill="#ff5555" scaleX="0.8" scaleY="0.8"/>
-                </graphic>
-            </Button>
-
-            <Label styleClass="text-desc" text="Нажмите 'Переустановить', если игра вылетает или файлы повреждены. Это удалит папку клиента и скачает её заново." wrapText="true"/>
-        </VBox>
-
-        <Separator opacity="0.1" />
-
-        <HBox alignment="CENTER_RIGHT">
-            <Button onAction="#onClose" text="ЗАКРЫТЬ" styleClass="aura-btn" />
-        </HBox>
-
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="mods-scroll-pane" VBox.vgrow="ALWAYS">
+            <content>
+                <VBox fx:id="modsContainer" spacing="12" style="-fx-padding: 5;">
+                </VBox>
+            </content>
+        </ScrollPane>
     </VBox>
+
+    <HBox alignment="CENTER_RIGHT" spacing="15" style="-fx-padding: 20; -fx-background-color: rgba(0,0,0,0.1);">
+
+        <Button onAction="#onReinstall" styleClass="button-outlined, button-danger" text="Переустановить клиент">
+            <style>
+                -fx-text-fill: #ff6b6b;
+                -fx-border-color: #ff6b6b;
+            </style>
+        </Button>
+
+        <Region HBox.hgrow="ALWAYS" />
+
+        <Button onAction="#onOpenFolder" styleClass="button-outlined" text="Открыть папку" />
+
+        <Button onAction="#onClose" styleClass="button-primary" text="Сохранить и Закрыть" />
+    </HBox>
+
 </VBox>
+</StackPane>

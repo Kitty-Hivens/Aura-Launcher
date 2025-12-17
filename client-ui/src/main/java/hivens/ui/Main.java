@@ -1,7 +1,6 @@
 package hivens.ui;
 
 import hivens.core.api.model.ServerProfile;
-import hivens.core.data.AuthStatus;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
 import javafx.application.Application;
@@ -9,7 +8,9 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Label;
 import javafx.scene.image.Image;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -26,11 +27,18 @@ public class Main extends Application {
 
     private static final Logger log = LoggerFactory.getLogger(Main.class);
     private LauncherDI container;
-    // [NEW] Геттер для доступа к главному окну из контроллеров
+
     @Getter
     private Stage primaryStage;
     private double xOffset = 0;
     private double yOffset = 0;
+
+    // Временный рут для отображения лоадера авто-входа
+    private StackPane rootLayout;
+
+    // Ссылки на контроллеры (необязательно хранить, но полезно для отладки)
+    private DashboardController dashboardController;
+    private LoginController loginController;
 
     @Override
     public void init() {
@@ -41,6 +49,7 @@ public class Main extends Application {
     public void start(Stage primaryStage) throws IOException {
         this.primaryStage = primaryStage;
 
+        // Настройка стиля окна
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setResizable(false);
         primaryStage.setTitle("Aura Launcher");
@@ -53,36 +62,114 @@ public class Main extends Application {
 
         Platform.setImplicitExit(true);
 
-        // --- [ВОССТАНОВЛЕННЫЙ БЛОК] ЛОГИКА АВТО-ВХОДА ---
-        SettingsData settings = container.getSettingsService().getSettings();
+        // Создаем базовую сцену (пустую или с лоадером)
+        rootLayout = new StackPane();
+        Scene scene = new Scene(rootLayout, 1050, 700); // Размер как у дашборда
+        scene.setFill(Color.TRANSPARENT);
 
-        // Проверяем наличие токена (пароль нам не нужен)
-        if (settings.isSaveCredentials() && settings.getSavedAccessToken() != null && !settings.getSavedAccessToken().isEmpty()) {
-            log.info("Auto-login: restoring session for {}", settings.getSavedUsername());
+        ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
 
-            // Восстанавливаем полную сессию, включая манифест файлов
-            SessionData restoredSession = new SessionData(
-                    AuthStatus.OK,
-                    settings.getSavedUsername(),
-                    settings.getSavedUuid(),
-                    settings.getSavedAccessToken(),
-                    settings.getSavedFileManifest()
-            );
+        primaryStage.setScene(scene);
+        makeDraggable(scene, rootLayout);
 
-            showDashboard(restoredSession);
+        // Инициализация контроллеров (ленивая или предварительная)
+        // Важно: DashboardController требует Main в конструкторе
+        this.dashboardController = new DashboardController(container, this);
+        this.loginController = new LoginController(container, this);
+
+        // 1. Проверяем, есть ли сохраненный пароль
+        var creds = container.getCredentialsManager().load();
+
+        if (creds != null && creds.decryptedPassword != null) {
+            log.info("Auto-login: Found credentials for user '{}'", creds.username);
+
+            // Показываем окно и лоадер
+            primaryStage.show();
+            showLoadingScreen("Подключение к серверу...");
+
+            // 2. Получаем список профилей, чтобы узнать валидный ID сервера
+            container.getServerListService().fetchProfiles().thenAccept(profiles -> {
+
+                String targetServerId = "Industrial"; // Fallback на случай проблем
+
+                if (profiles != null && !profiles.isEmpty()) {
+                    // Пытаемся найти последний запущенный сервер
+                    String lastId = container.getProfileManager().getLastServerId();
+
+                    // Если последний сервер есть в списке - используем его
+                    if (lastId != null && profiles.stream().anyMatch(p -> p.getAssetDir().equals(lastId))) {
+                        targetServerId = lastId;
+                    } else {
+                        // Иначе берем первый попавшийся
+                        targetServerId = profiles.get(0).getAssetDir();
+                    }
+                } else {
+                    log.warn("Auto-login warning: Profiles list is empty, using default ID");
+                }
+
+                // 3. Выполняем вход с найденным ID
+                performAutoLogin(creds.username, creds.decryptedPassword, targetServerId);
+
+            }).exceptionally(ex -> {
+                // Если не удалось получить список серверов — идем на экран входа
+                log.error("Auto-login failed: could not fetch server list", ex);
+                Platform.runLater(() -> {
+                    try { showLoginScene(); } catch (IOException e) { e.printStackTrace(); }
+                });
+                return null;
+            });
+
         } else {
+            // Данных нет — показываем логин
             showLoginScene();
         }
     }
 
-    /**
-     * Показывает основной дашборд и передает в него сессию
-     */
+    // Вспомогательный метод для выполнения входа
+    private void performAutoLogin(String username, String password, String serverId) {
+        new Thread(() -> {
+            try {
+                // Реальный вход через API
+                SessionData session = container.getAuthService().login(username, password, serverId);
+
+                Platform.runLater(() -> {
+                    log.info("Auto-login successful!");
+                    try {
+                        showDashboard(session);
+                    } catch (IOException e) {
+                        log.error("Failed to show dashboard after autologin", e);
+                        try { showLoginScene(); } catch (IOException ex) {}
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Auto-login failed (invalid credentials or network error)", e);
+
+                // Если пароль не подошел — удаляем его, чтобы не пытаться снова
+                container.getCredentialsManager().clear();
+
+                Platform.runLater(() -> {
+                    try { showLoginScene(); } catch (IOException ex) {}
+                });
+            }
+        }).start();
+    }
+
+    private void showLoadingScreen(String message) {
+        Label label = new Label(message);
+        label.setStyle("-fx-text-fill: white; -fx-font-size: 14px;");
+        StackPane pane = new StackPane(label);
+        pane.setStyle("-fx-background-color: #2b2b2b; -fx-background-radius: 10;");
+        rootLayout.getChildren().setAll(pane);
+    }
+
+    // --- Методы навигации ---
+
     public void showDashboard(SessionData session) throws IOException {
         primaryStage.setWidth(1050);
         primaryStage.setHeight(700);
 
         FXMLLoader loader = loadFXML("MainDashboard.fxml");
+        // Передаем Main в конструктор контроллера
         loader.setControllerFactory(clz -> new DashboardController(container, this));
 
         Parent root = loader.load();
@@ -93,10 +180,10 @@ public class Main extends Application {
         applyScene(root);
     }
 
-    /**
-     * Показывает экран входа
-     */
     public void showLoginScene() throws IOException {
+        primaryStage.setWidth(925); // Размер окна логина
+        primaryStage.setHeight(530);
+
         FXMLLoader loader = loadFXML("LoginForm.fxml");
         loader.setControllerFactory(clz -> new LoginController(container, this));
 
@@ -125,18 +212,11 @@ public class Main extends Application {
         controller.startProcess(task, thread);
     }
 
-    private void applySceneToStage(Stage stage, Parent root) {
-        Scene scene = new Scene(root);
-        scene.setFill(Color.TRANSPARENT);
-        ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
-        makeDraggable(scene, root);
-        stage.setScene(scene);
-    }
-
-    private void applyScene(Parent root) {
-        applySceneToStage(primaryStage, root);
-        primaryStage.centerOnScreen();
-        if (!primaryStage.isShowing()) primaryStage.show();
+    // [FIX] Восстановленный метод hideWindow
+    public void hideWindow() {
+        Platform.runLater(() -> {
+            if (primaryStage != null) primaryStage.hide();
+        });
     }
 
     public void showGlobalSettings() {
@@ -160,7 +240,7 @@ public class Main extends Application {
             settingsStage.setScene(scene);
             settingsStage.showAndWait();
 
-            // Обновляем тему главного окна после закрытия (на случай отмены или сохранения)
+            // Обновляем тему главного окна после закрытия
             ThemeManager.applyTheme(primaryStage.getScene(), container.getSettingsService().getSettings());
 
         } catch (IOException e) {
@@ -168,26 +248,29 @@ public class Main extends Application {
         }
     }
 
-    private void showScene(FXMLLoader loader) throws IOException {
-        Parent root = loader.load();
+    // --- Вспомогательные методы ---
+
+    private void applySceneToStage(Stage stage, Parent root) {
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
         ThemeManager.applyTheme(scene, container.getSettingsService().getSettings());
         makeDraggable(scene, root);
-        primaryStage.setScene(scene);
-        if (!primaryStage.isShowing()) {
-            primaryStage.show();
-        }
+        stage.setScene(scene);
+    }
+
+    private void applyScene(Parent root) {
+        applySceneToStage(primaryStage, root);
+        primaryStage.centerOnScreen();
+        if (!primaryStage.isShowing()) primaryStage.show();
+    }
+
+    private void showScene(FXMLLoader loader) throws IOException {
+        Parent root = loader.load();
+        applyScene(root);
     }
 
     private FXMLLoader loadFXML(String fxml) {
         return new FXMLLoader(getClass().getResource("/fxml/" + fxml));
-    }
-
-    public void hideWindow() {
-        Platform.runLater(() -> {
-            if (primaryStage != null) primaryStage.hide();
-        });
     }
 
     private void makeDraggable(Scene scene, Parent root) {

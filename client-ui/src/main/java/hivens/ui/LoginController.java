@@ -1,23 +1,22 @@
 package hivens.ui;
 
-import hivens.core.api.model.ServerProfile;
+import hivens.core.api.AuthException;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-
 public class LoginController {
 
     private static final Logger log = LoggerFactory.getLogger(LoginController.class);
 
     private final LauncherDI di;
-    private final Main mainApp;
+    private final Main mainApp; // Используем Main для переключения сцен
 
     @FXML private TextField loginField;
     @FXML private PasswordField passwordField;
@@ -32,11 +31,12 @@ public class LoginController {
 
     @FXML
     private void initialize() {
+        // Предзаполняем логин, если он был сохранен ранее (из SettingsData)
+        // Хотя теперь у нас есть CredentialsManager, старый механизм можно оставить для удобства
         SettingsData settings = di.getSettingsService().getSettings();
         if (settings.getSavedUsername() != null) {
             loginField.setText(settings.getSavedUsername());
         }
-        rememberMeCheck.setSelected(settings.isSaveCredentials());
     }
 
     @FXML
@@ -53,7 +53,7 @@ public class LoginController {
         setBusy(true);
         statusLabel.setText("Получение списка серверов...");
 
-        // 1. Сначала получаем список серверов, чтобы узнать валидный ID
+        // 1. Получаем список серверов (Ваша логика)
         di.getServerListService().fetchProfiles().thenAccept(profiles -> {
 
             if (profiles == null || profiles.isEmpty()) {
@@ -65,12 +65,11 @@ public class LoginController {
                 return;
             }
 
-            // Берем ID первого сервера (например "HiTech" или "Sandbox")
-            // Это нужно только для получения сессии, сам сервер выберем потом в Дашборде
+            // Берем ID первого сервера для первичной авторизации
             String validServerId = profiles.get(0).getAssetDir();
             log.info("Using server ID for initial login: {}", validServerId);
 
-            // 2. Теперь выполняем вход с валидным ID
+            // 2. Выполняем вход
             performAuth(login, pass, validServerId);
 
         }).exceptionally(ex -> {
@@ -83,70 +82,88 @@ public class LoginController {
         });
     }
 
-    private void performAuth(String login, String pass, String serverId) {
+    private void performAuth(String login, String password, String serverId) {
         Platform.runLater(() -> statusLabel.setText("Авторизация..."));
 
-        try {
-            // Выполняем синхронный запрос (внутри фонового потока CompletableFuture это ок,
-            // но лучше обернуть в отдельный task, если fetchProfiles возвращает поток UI.
-            // ServerListService.fetchProfiles возвращает future из supplyAsync, так что мы в воркере.
+        Task<SessionData> loginTask = new Task<>() {
+            @Override
+            protected SessionData call() throws Exception {
+                // AuthService вернет сессию с serverId и cachedPassword (если вы обновили AuthService)
+                return di.getAuthService().login(login, password, serverId);
+            }
+        };
 
-            SessionData session = di.getAuthService().login(login, pass, serverId);
+        loginTask.setOnSucceeded(e -> {
+            SessionData session = loginTask.getValue();
+            log.info("Login successful for user: {}", session.playerName());
+
+            // [NEW] Сохраняем пароль в зашифрованном файле
+            if (rememberMeCheck.isSelected()) {
+                di.getCredentialsManager().save(login, password);
+            } else {
+                di.getCredentialsManager().clear();
+            }
+
+            // Также обновляем старые настройки (для совместимости)
+            saveLegacySettings(session);
 
             Platform.runLater(() -> {
-                log.info("Login successful for user: {}", session.playerName());
-                saveCredentials(session);
-                openDashboard(session);
+                try {
+                    // Переключаем сцену через Main
+                    mainApp.showDashboard(session);
+                } catch (Exception ex) {
+                    log.error("Failed to show dashboard", ex);
+                    statusLabel.setText("Ошибка UI: " + ex.getMessage());
+                }
+                setBusy(false);
+                passwordField.clear();
             });
+        });
 
-        } catch (Exception e) {
+        loginTask.setOnFailed(e -> {
+            Throwable error = loginTask.getException();
+            log.error("Login failed", error);
             Platform.runLater(() -> {
-                log.error("Auth failed", e);
-                // Показываем красивое сообщение ошибки (например "Неверный пароль")
-                statusLabel.setText(translateError(e.getMessage()));
+                String msg = error.getMessage();
+                if (error instanceof AuthException) {
+                    msg = translateError(msg);
+                } else if (msg == null || msg.isBlank()) {
+                    msg = "Ошибка соединения";
+                }
+                statusLabel.setText(msg);
                 setBusy(false);
                 animateError(statusLabel);
             });
+        });
+
+        new Thread(loginTask).start();
+    }
+
+    private void saveLegacySettings(SessionData session) {
+        SettingsData settings = di.getSettingsService().getSettings();
+        if (rememberMeCheck.isSelected()) {
+            settings.setSaveCredentials(true);
+            settings.setSavedUsername(session.playerName());
+            // Токен сохранять не обязательно, так как мы теперь используем пароль,
+            // но можно оставить для старой логики
+            settings.setSavedAccessToken(session.accessToken());
+        } else {
+            settings.setSaveCredentials(false);
+            settings.setSavedAccessToken(null);
         }
+        di.getSettingsService().saveSettings(settings);
     }
 
     private String translateError(String error) {
         if (error.contains("BAD_LOGIN")) return "Пользователь не найден";
         if (error.contains("BAD_PASSWORD")) return "Неверный пароль";
-        if (error.contains("SERVER")) return "Ошибка сервера (ID)";
         return "Ошибка: " + error;
     }
 
-    private void saveCredentials(SessionData session) {
-        SettingsData settings = di.getSettingsService().getSettings();
-        boolean save = rememberMeCheck.isSelected();
-
-        settings.setSaveCredentials(save);
-        if (save) {
-            settings.setSavedUsername(session.playerName());
-            settings.setSavedUuid(session.uuid());
-            settings.setSavedAccessToken(session.accessToken());
-            settings.setSavedFileManifest(session.fileManifest());
-        } else {
-            settings.setSavedAccessToken(null);
-            settings.setSavedFileManifest(null);
-        }
-        di.getSettingsService().saveSettings(settings);
-    }
-
-    private void openDashboard(SessionData session) {
-        try {
-            mainApp.showDashboard(session);
-        } catch (Exception e) {
-            log.error("Failed to show dashboard", e);
-            statusLabel.setText("Critical Error: UI Switch Failed");
-        }
-    }
-
     private void setBusy(boolean busy) {
-        loginButton.setDisable(busy);
-        loginField.setDisable(busy);
-        passwordField.setDisable(busy);
+        if (loginButton != null) loginButton.setDisable(busy);
+        if (loginField != null) loginField.setDisable(busy);
+        if (passwordField != null) passwordField.setDisable(busy);
     }
 
     private void animateError(javafx.scene.Node node) {
@@ -159,8 +176,7 @@ public class LoginController {
     }
 
     @FXML private void onMinimize() {
-        Stage stage = (Stage) loginButton.getScene().getWindow();
-        stage.setIconified(true);
+        if (mainApp.getPrimaryStage() != null) mainApp.getPrimaryStage().setIconified(true);
     }
 
     @FXML private void onExit() {

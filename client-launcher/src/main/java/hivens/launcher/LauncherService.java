@@ -2,11 +2,8 @@ package hivens.launcher;
 
 import hivens.core.api.ILauncherService;
 import hivens.core.api.IManifestProcessorService;
-import hivens.core.data.FileManifest;
+import hivens.core.data.*;
 import hivens.core.api.model.ServerProfile;
-import hivens.core.data.InstanceProfile;
-import hivens.core.data.OptionalMod;
-import hivens.core.data.SessionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,8 +13,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+
+import static hivens.core.util.ZipUtils.unzip;
 
 public class LauncherService implements ILauncherService {
 
@@ -75,8 +72,9 @@ public class LauncherService implements ILauncherService {
         if (config == null) throw new IOException("Unsupported version: " + version);
 
         // Синхронизация модов
-        List<OptionalMod> allMods = ((ManifestProcessorService) manifestProcessor).getOptionalModsForClient(version);
-        syncMods(clientRootPath, profile, allMods);
+        List<OptionalMod> allMods = manifestProcessor.getOptionalModsForClient(serverProfile);
+        log.info("Syncing {} mods for profile {}", allMods.size(), serverProfile.getName());
+        syncMods(clientRootPath, profile, allMods, sessionData.fileManifest(), version);
 
         // Подготовка файлов (нативы)
         prepareNatives(clientRootPath, config.nativesDir(), version);
@@ -272,53 +270,71 @@ public class LauncherService implements ILauncherService {
         }
     }
 
-    private static void unzip(File zipFile, File destDir) throws IOException {
-        if (!destDir.exists()) destDir.mkdirs();
-        byte[] buffer = new byte[4096];
-        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile))) {
-            ZipEntry zipEntry = zis.getNextEntry();
-            while (zipEntry != null) {
-                File newFile = new File(destDir, zipEntry.getName());
-                if (zipEntry.isDirectory()) {
-                    newFile.mkdirs();
-                } else {
-                    new File(newFile.getParent()).mkdirs();
-                    try (FileOutputStream fos = new FileOutputStream(newFile)) {
-                        int len;
-                        while ((len = zis.read(buffer)) > 0) fos.write(buffer, 0, len);
-                    }
-                }
-                zipEntry = zis.getNextEntry();
-            }
-            zis.closeEntry();
-        }
-    }
-
     /**
-     * "Хирург": Удаляет выключенные моды и конфликтующие файлы перед запуском.
+     * "Хирург": Удаляет ВСЁ лишнее из папки mods, обеспечивая чистоту сборки.
      */
-    private void syncMods(Path clientRoot, InstanceProfile profile, List<OptionalMod> allMods) throws IOException {
+    private void syncMods(Path clientRoot, InstanceProfile profile, List<OptionalMod> allMods, FileManifest manifest, String clientVersion) throws IOException {
         Path modsDir = clientRoot.resolve("mods");
         if (!Files.exists(modsDir)) Files.createDirectories(modsDir);
 
-        // Загружаем выбор игрока (true/false)
-        Map<String, Boolean> state = profile.getOptionalModsState();
+        // 1. Составляем "Белый список" (Whitelist)
+        Set<String> allowedFiles = new HashSet<>();
 
+        // А) Обязательные моды из манифеста
+        // [FIX] Используем flattenManifest, чтобы достать файлы из глубины папок!
+        Map<String, FileData> flatFiles = manifestProcessor.flattenManifest(manifest);
+
+        for (String path : flatFiles.keySet()) {
+            // path выглядит как "Industrial/mods/1.12.2/jei.jar" или "mods/jei.jar"
+            // Нам нужно понять, является ли файл модом.
+            if (path.contains("/mods/") || path.startsWith("mods/")) {
+                String fileName = new File(path).getName();
+                allowedFiles.add(fileName);
+            }
+        }
+
+        // Б) Опциональные моды
+        Map<String, Boolean> state = profile.getOptionalModsState();
         for (OptionalMod mod : allMods) {
-            // Если игрок не выбирал, берем дефолтное значение
             boolean isEnabled = state.getOrDefault(mod.getId(), mod.isDefault());
 
             if (isEnabled) {
-                if (mod.getExcludings() != null) {
-                    for (String exclude : mod.getExcludings()) {
-                        Files.deleteIfExists(modsDir.resolve(exclude));
-                    }
-                }
-            } else {
-                for (String jar : mod.getJars()) {
-                    Files.deleteIfExists(modsDir.resolve(jar));
-                }
+                if (mod.getJars() != null) allowedFiles.addAll(mod.getJars());
             }
+            // Выключенные моды не добавляем -> они будут удалены как "чужие"
+        }
+
+        // 2. Сканируем и чистим
+        // Чистим корень mods/
+        cleanDirectory(modsDir, allowedFiles);
+
+        // Чистим папку версии (например mods/1.12.2/)
+        if (clientVersion != null && !clientVersion.isEmpty()) {
+            Path versionModsDir = modsDir.resolve(clientVersion);
+            if (Files.exists(versionModsDir)) {
+                cleanDirectory(versionModsDir, allowedFiles);
+            }
+        }
+
+        log.info("Mods folder synced for version {}. Allowed files: {}", clientVersion, allowedFiles.size());
+    }
+
+    private void cleanDirectory(Path dir, Set<String> allowedFiles) throws IOException {
+        try (Stream<Path> stream = Files.list(dir)) {
+            stream.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".jar") || path.toString().endsWith(".zip")) // Только моды
+                    .forEach(path -> {
+                        String fileName = path.getFileName().toString();
+                        // Если файла нет в белом списке -> удаляем
+                        if (!allowedFiles.contains(fileName)) {
+                            try {
+                                log.info("Deleting extraneous file: {}", fileName);
+                                Files.delete(path);
+                            } catch (IOException e) {
+                                log.error("Failed to delete {}", fileName, e);
+                            }
+                        }
+                    });
         }
     }
 
