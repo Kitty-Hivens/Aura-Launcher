@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import hivens.core.data.InstanceProfile;
-import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +25,6 @@ public class ProfileManager {
     private final Gson gson;
     private final Map<String, InstanceProfile> profiles = new HashMap<>();
 
-    @Getter
     private String lastServerId;
 
     public ProfileManager(Path workDir, Gson gson) {
@@ -68,14 +66,16 @@ public class ProfileManager {
                     if (json.has("profiles")) {
                         Map<String, InstanceProfile> loaded = gson.fromJson(
                                 json.get("profiles"),
-                                new TypeToken<Map<String, InstanceProfile>>(){}.getType()
+                                new TypeToken<Map<String, InstanceProfile>>() {
+                                }.getType()
                         );
                         if (loaded != null) profiles.putAll(loaded);
                     }
                 } else {
                     Map<String, InstanceProfile> loaded = gson.fromJson(
                             root,
-                            new TypeToken<Map<String, InstanceProfile>>(){}.getType()
+                            new TypeToken<Map<String, InstanceProfile>>() {
+                            }.getType()
                     );
                     if (loaded != null) profiles.putAll(loaded);
                 }
@@ -100,5 +100,9 @@ public class ProfileManager {
         } catch (IOException e) {
             log.error("Failed to save profiles!", e);
         }
+    }
+
+    public String getLastServerId() {
+        return this.lastServerId;
     }
 }

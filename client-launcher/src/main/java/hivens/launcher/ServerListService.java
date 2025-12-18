@@ -42,11 +42,6 @@ public class ServerListService implements IServerListService {
         });
     }
 
-    // Метод для принудительного обновления (например, кнопка "Обновить")
-    public void clearCache() {
-        this.cachedProfiles = null;
-    }
-
     private static ServerProfile getProfile(SmartyServer srv) {
         ServerProfile profile = new ServerProfile();
         profile.setName(srv.name);

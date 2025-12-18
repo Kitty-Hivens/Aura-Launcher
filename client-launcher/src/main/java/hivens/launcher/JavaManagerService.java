@@ -17,15 +17,12 @@ import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-public class JavaManagerService {
+public record JavaManagerService(Path runtimesDir, OkHttpClient httpClient) {
 
     private static final Logger log = LoggerFactory.getLogger(JavaManagerService.class);
 
-    private final Path runtimesDir;
-    private final OkHttpClient httpClient;
-
-    public JavaManagerService(Path dataDir, OkHttpClient httpClient) {
-        this.runtimesDir = dataDir.resolve("runtimes");
+    public JavaManagerService(Path runtimesDir, OkHttpClient httpClient) {
+        this.runtimesDir = runtimesDir.resolve("runtimes");
         this.httpClient = httpClient;
     }
 
@@ -51,7 +48,8 @@ public class JavaManagerService {
 
     private int detectJavaVersion(String mcVersion) {
         if (mcVersion.startsWith("1.21") || mcVersion.startsWith("1.20.5") || mcVersion.startsWith("1.20.6")) return 21;
-        if (mcVersion.startsWith("1.17") || mcVersion.startsWith("1.18") || mcVersion.startsWith("1.19") || mcVersion.startsWith("1.20")) return 17;
+        if (mcVersion.startsWith("1.17") || mcVersion.startsWith("1.18") || mcVersion.startsWith("1.19") || mcVersion.startsWith("1.20"))
+            return 17;
         return 8; // Default for 1.7.10 - 1.16.5
     }
 
@@ -95,36 +93,50 @@ public class JavaManagerService {
         // --- JAVA 8 (8u472+9) ---
         if (version == 8) {
             if (os.equals("win")) {
-                if (arch.equals("x64")) return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-amd64-full.zip";
-                if (arch.equals("x32")) return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-i586.zip";
+                if (arch.equals("x64"))
+                    return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-amd64-full.zip";
+                if (arch.equals("x32"))
+                    return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-i586.zip";
             }
-            if (os.equals("linux") && arch.equals("x64")) return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-linux-amd64-full.tar.gz";
+            if (os.equals("linux") && arch.equals("x64"))
+                return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-linux-amd64-full.tar.gz";
             if (os.equals("mac")) {
-                if (arch.equals("x64")) return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-macos-amd64-full.tar.gz";
-                if (arch.equals("arm64")) return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-macos-aarch64.tar.gz";
+                if (arch.equals("x64"))
+                    return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-macos-amd64-full.tar.gz";
+                if (arch.equals("arm64"))
+                    return "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-macos-aarch64.tar.gz";
             }
         }
 
         // --- JAVA 17 (17.0.17+15) ---
         if (version == 17) {
             if (os.equals("win")) {
-                if (arch.equals("x64")) return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-windows-amd64-full.zip";
-                if (arch.equals("x32")) return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-windows-i586-full.zip";
+                if (arch.equals("x64"))
+                    return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-windows-amd64-full.zip";
+                if (arch.equals("x32"))
+                    return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-windows-i586-full.zip";
             }
-            if (os.equals("linux") && arch.equals("x64")) return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-linux-amd64-full.tar.gz";
+            if (os.equals("linux") && arch.equals("x64"))
+                return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-linux-amd64-full.tar.gz";
             if (os.equals("mac")) {
-                if (arch.equals("x64")) return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-macos-amd64-full.tar.gz";
-                if (arch.equals("arm64")) return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-macos-aarch64-full.tar.gz";
+                if (arch.equals("x64"))
+                    return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-macos-amd64-full.tar.gz";
+                if (arch.equals("arm64"))
+                    return "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-macos-aarch64-full.tar.gz";
             }
         }
 
         // --- JAVA 21 (21.0.9+15) ---
         if (version == 21) {
-            if (os.equals("win") && arch.equals("x64")) return "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-windows-amd64-full.zip";
-            if (os.equals("linux") && arch.equals("x64")) return "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-linux-amd64-full.tar.gz";
+            if (os.equals("win") && arch.equals("x64"))
+                return "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-windows-amd64-full.zip";
+            if (os.equals("linux") && arch.equals("x64"))
+                return "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-linux-amd64-full.tar.gz";
             if (os.equals("mac")) {
-                if (arch.equals("x64")) return "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-amd64-full.tar.gz";
-                if (arch.equals("arm64")) return "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-aarch64-full.tar.gz";
+                if (arch.equals("x64"))
+                    return "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-amd64-full.tar.gz";
+                if (arch.equals("arm64"))
+                    return "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-aarch64-full.tar.gz";
             }
         }
 
@@ -157,7 +169,9 @@ public class JavaManagerService {
                         return name.equals("java") || name.equals("java.exe");
                     })
                     .findFirst().orElse(null);
-        } catch (IOException e) { return null; }
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     private void unzip(File zip, Path dest) throws IOException {

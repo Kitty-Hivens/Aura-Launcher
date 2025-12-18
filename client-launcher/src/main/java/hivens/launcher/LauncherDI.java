@@ -3,7 +3,6 @@ package hivens.launcher;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import hivens.core.api.*;
-import lombok.Getter;
 import okhttp3.Authenticator;
 import okhttp3.Credentials;
 import okhttp3.OkHttpClient;
@@ -13,7 +12,6 @@ import java.net.Proxy;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-@Getter
 public class LauncherDI {
 
     private final Path dataDirectory;
@@ -35,7 +33,7 @@ public class LauncherDI {
     public LauncherDI() {
         String userHome = System.getProperty("user.home");
         this.dataDirectory = Paths.get(userHome, ".aura");
-        
+
         // Gson
         this.gson = new GsonBuilder().setPrettyPrinting().create();
 
@@ -58,19 +56,70 @@ public class LauncherDI {
         this.serverListService = new ServerListService();
         this.settingsService = new SettingsService(gson, dataDirectory.resolve("settings.json"));
         this.credentialsManager = new CredentialsManager(dataDirectory, gson);
-        
+
         // 1. Менеджер профилей (InstanceProfile)
         this.profileManager = new ProfileManager(dataDirectory, gson);
-        
+
         // 2. Менеджер Java (Скачивание JDK)
         this.javaManagerService = new JavaManagerService(dataDirectory, httpClient);
 
         // 3. Лаунчер Сервис
         this.launcherService = new LauncherService(
-            manifestProcessorService, 
-            profileManager, 
-            javaManagerService
+                manifestProcessorService,
+                profileManager,
+                javaManagerService
         );
     }
 
+    public Path getDataDirectory() {
+        return this.dataDirectory;
+    }
+
+    public OkHttpClient getHttpClient() {
+        return this.httpClient;
+    }
+
+    public Gson getGson() {
+        return this.gson;
+    }
+
+    public IAuthService getAuthService() {
+        return this.authService;
+    }
+
+    public IFileIntegrityService getIntegrityService() {
+        return this.integrityService;
+    }
+
+    public IFileDownloadService getDownloadService() {
+        return this.downloadService;
+    }
+
+    public IManifestProcessorService getManifestProcessorService() {
+        return this.manifestProcessorService;
+    }
+
+    public ILauncherService getLauncherService() {
+        return this.launcherService;
+    }
+
+    public IServerListService getServerListService() {
+        return this.serverListService;
+    }
+
+    public ISettingsService getSettingsService() {
+        return this.settingsService;
+    }
+
+    public ProfileManager getProfileManager() {
+        return this.profileManager;
+    }
+
+    public JavaManagerService getJavaManagerService() {
+        return this.javaManagerService;
+    }
+
+    public CredentialsManager getCredentialsManager() {
+        return this.credentialsManager;
+    }
 }
