@@ -1,12 +1,7 @@
 package hivens.core.api.model;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.Map;
 
-@Setter
-@Getter
 public class ServerProfile {
     private String name;
     private String title;
@@ -14,9 +9,6 @@ public class ServerProfile {
     private String ip;
     private int port;
     private String assetDir;
-
-    // [FIX] Геттеры и сеттеры для extraCheckSum
-    // [FIX] Поле для хранения хеша extra.zip
     private String extraCheckSum;
 
     private Map<String, Object> optionalModsData;
@@ -33,7 +25,69 @@ public class ServerProfile {
         this.title = name + " " + version;
     }
 
-    // --- Getters & Setters ---
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    public String getIp() {
+        return ip;
+    }
+
+    public void setIp(String ip) {
+        this.ip = ip;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public void setPort(int port) {
+        this.port = port;
+    }
+
+    public String getAssetDir() {
+        return assetDir;
+    }
+
+    public void setAssetDir(String assetDir) {
+        this.assetDir = assetDir;
+    }
+
+    public String getExtraCheckSum() {
+        return extraCheckSum;
+    }
+
+    public void setExtraCheckSum(String extraCheckSum) {
+        this.extraCheckSum = extraCheckSum;
+    }
+
+    public Map<String, Object> getOptionalModsData() {
+        return optionalModsData;
+    }
+
+    public void setOptionalModsData(Map<String, Object> optionalModsData) {
+        this.optionalModsData = optionalModsData;
+    }
 
     @Override
     public String toString() {

@@ -6,8 +6,4 @@ dependencies {
 
     // JSON-маппинг
     implementation("com.google.code.gson:gson:2.10.1")
-
-    // Lombok
-    compileOnly("org.projectlombok:lombok:1.18.30")
-    annotationProcessor("org.projectlombok:lombok:1.18.30")
 }

@@ -137,7 +137,6 @@ public class AuthService implements IAuthService {
                 String uuid = authResp.uuid;
                 if (uuid != null) uuid = uuid.replace("-", "");
 
-                // [FIX] Возвращаем SessionData со всеми полями для Lazy Re-auth
                 return new SessionData(
                         authResp.status,
                         authResp.playername,
