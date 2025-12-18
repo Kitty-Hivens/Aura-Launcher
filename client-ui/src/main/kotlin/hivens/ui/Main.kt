@@ -1,6 +1,8 @@
 package hivens.ui
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -36,26 +39,25 @@ import hivens.ui.components.GlassCard
 import hivens.ui.screens.*
 import hivens.ui.theme.CaelestiaTheme
 import hivens.ui.utils.SkinManager
-import kotlinx.coroutines.launch
+import kotlin.math.cos
+import kotlin.math.sin
 
 val di = LauncherDI()
 
 sealed class AppState {
-    object Login : AppState()
+    data object Login : AppState()
     data class Shell(val session: SessionData) : AppState()
 }
 
 sealed class ShellScreen {
-    object Home : ShellScreen()
-    object Profile : ShellScreen()
-    object GlobalSettings : ShellScreen()
+    data object Home : ShellScreen()
+    data object Profile : ShellScreen()
+    data object GlobalSettings : ShellScreen()
     data class ServerSettings(val server: ServerProfile) : ShellScreen()
 }
 
 fun main() = application {
     val windowState = rememberWindowState(width = 1000.dp, height = 650.dp)
-
-    // Состояние темы (по умолчанию темная)
     var isDarkTheme by remember { mutableStateOf(true) }
 
     Window(
@@ -81,17 +83,12 @@ fun main() = application {
             }
 
             when (val state = appState) {
-                is AppState.Login -> LoginScreen(
-                    onLoginSuccess = { session -> appState = AppState.Shell(session) }
-                )
+                is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
                 is AppState.Shell -> ShellUI(
                     initialSession = state.session,
                     isDarkTheme = isDarkTheme,
                     onToggleTheme = { isDarkTheme = !isDarkTheme },
-                    onLogout = {
-                        di.credentialsManager.clear()
-                        appState = AppState.Login
-                    },
+                    onLogout = { di.credentialsManager.clear(); appState = AppState.Login },
                     onCloseApp = ::exitApplication
                 )
             }
@@ -110,20 +107,65 @@ fun ShellUI(
     var currentSession by remember { mutableStateOf(initialSession) }
     var currentScreen by remember { mutableStateOf<ShellScreen>(ShellScreen.Home) }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
-
-    // Загрузка лица для аватара
     var faceBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
     LaunchedEffect(currentSession.playerName) {
         faceBitmap = SkinManager.getSkinFront(currentSession.playerName)
     }
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
-        val bgColors = if (isDarkTheme)
-            listOf(Color(0xFF0F0F0F), Color(0xFF151515))
-        else
-            listOf(Color(0xFFFFFFFF), Color(0xFFF0F0F0))
+    // --- Анимация фона ---
+    val infiniteTransition = rememberInfiniteTransition()
+    val t by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.28f, // 2*PI
+        animationSpec = infiniteRepeatable(
+            animation = tween(20000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        )
+    )
 
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(colors = bgColors)))
+    // [FIX] Захватываем цвета из темы ЗДЕСЬ, так как внутри Canvas это делать нельзя
+    val primaryColor = CaelestiaTheme.colors.primary
+    val successColor = CaelestiaTheme.colors.success
+    val bgAlpha = if (isDarkTheme) 0.15f else 0.05f
+    val glowAlpha = if (isDarkTheme) 0.1f else 0.05f
+
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
+        // Живой фон "Aurora"
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+
+            // Пятно 1
+            val x1 = width * 0.5f + cos(t) * width * 0.3f
+            val y1 = height * 0.5f + sin(t) * height * 0.2f
+
+            // Пятно 2
+            val x2 = width * 0.5f + cos(t + 3.14f) * width * 0.3f
+            val y2 = height * 0.5f + sin(t * 0.8f) * height * 0.2f
+
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        primaryColor.copy(alpha = bgAlpha), // [FIX] Используем захваченную переменную
+                        Color.Transparent
+                    ),
+                    center = Offset(x1, y1),
+                    radius = width * 0.6f
+                )
+            )
+
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        successColor.copy(alpha = glowAlpha), // [FIX] Используем захваченную переменную
+                        Color.Transparent
+                    ),
+                    center = Offset(x2, y2),
+                    radius = width * 0.5f
+                )
+            )
+        }
 
         Row(Modifier.fillMaxSize().padding(24.dp)) {
             // --- DOCK ---
@@ -136,11 +178,9 @@ fun ShellUI(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(32.dp)
                 ) {
-                    // Аватарка
+                    // Аватар
                     Box(
-                        Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
+                        Modifier.size(48.dp).clip(CircleShape)
                             .background(CaelestiaTheme.colors.surface)
                             .border(1.dp, CaelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape),
                         contentAlignment = Alignment.TopCenter
@@ -149,7 +189,7 @@ fun ShellUI(
                             Image(
                                 painter = BitmapPainter(faceBitmap!!),
                                 contentDescription = null,
-                                modifier = Modifier.size(48.dp).offset(y = 4.dp), // Смещаем, чтобы лицо было по центру
+                                modifier = Modifier.size(48.dp).offset(y = 4.dp),
                                 contentScale = ContentScale.Crop,
                                 alignment = Alignment.TopCenter
                             )
@@ -164,15 +204,9 @@ fun ShellUI(
 
                     Spacer(Modifier.height(16.dp))
 
-                    NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings) {
-                        currentScreen = ShellScreen.Home
-                    }
-                    NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) {
-                        currentScreen = ShellScreen.Profile
-                    }
-                    NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) {
-                        currentScreen = ShellScreen.GlobalSettings
-                    }
+                    NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings) { currentScreen = ShellScreen.Home }
+                    NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) { currentScreen = ShellScreen.Profile }
+                    NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) { currentScreen = ShellScreen.GlobalSettings }
 
                     Spacer(Modifier.weight(1f))
 
@@ -197,10 +231,7 @@ fun ShellUI(
                             onOpenServerSettings = { server -> currentScreen = ShellScreen.ServerSettings(server) }
                         )
                         is ShellScreen.Profile -> ProfileScreen(currentSession)
-                        is ShellScreen.GlobalSettings -> SettingsScreen(
-                            isDarkTheme = isDarkTheme,
-                            onToggleTheme = onToggleTheme
-                        )
+                        is ShellScreen.GlobalSettings -> SettingsScreen(isDarkTheme = isDarkTheme, onToggleTheme = onToggleTheme)
                         is ShellScreen.ServerSettings -> ServerSettingsScreen(
                             server = screen.server,
                             onBack = { currentScreen = ShellScreen.Home }

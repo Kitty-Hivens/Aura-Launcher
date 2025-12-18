@@ -1,7 +1,11 @@
 package hivens.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -16,6 +20,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.font.FontWeight
@@ -246,12 +251,43 @@ fun Badge(text: String, color: Color) {
 
 @Composable
 fun ServerChip(name: String, isSelected: Boolean, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    // Анимация масштаба
+    val scale by animateFloatAsState(
+        targetValue = if (isHovered || isSelected) 1.05f else 1.0f,
+        animationSpec = tween(durationMillis = 200)
+    )
+
+    // Анимация прозрачности фона
+    val backgroundColor = if (isSelected) CaelestiaTheme.colors.primary
+    else if (isHovered) CaelestiaTheme.colors.surface.copy(alpha = 0.9f)
+    else CaelestiaTheme.colors.surface
+
     Box(
-        modifier = Modifier.height(40.dp).defaultMinSize(minWidth = 100.dp).clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) CaelestiaTheme.colors.primary else CaelestiaTheme.colors.surface)
-            .clickable(onClick = onClick).padding(horizontal = 20.dp),
+        modifier = Modifier
+            .height(40.dp)
+            .defaultMinSize(minWidth = 100.dp)
+            // Применяем масштаб
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null // Убираем ripple, он тут лишний при наличии scale
+            ) { onClick() }
+            .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = name, color = if (isSelected) Color.Black else CaelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(
+            text = name,
+            color = if (isSelected) Color.Black else CaelestiaTheme.colors.textPrimary,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
     }
 }
