@@ -1,43 +1,49 @@
 plugins {
-    id("java")
-    id("application")
-    id("org.openjfx.javafxplugin") version "0.0.13"
+    kotlin("jvm")
+    id("org.jetbrains.compose") version "1.7.0"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
 }
 
+group = "hivens"
+version = "1.0-SNAPSHOT"
+
 repositories {
+    google()
     mavenCentral()
+    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
 }
 
 dependencies {
+    implementation(project(":client-config"))
     implementation(project(":client-core"))
     implementation(project(":client-launcher"))
-    implementation(project(":client-config"))
 
-    // JavaFX
-    implementation("org.openjfx:javafx-controls:17.0.8")
-    implementation("org.openjfx:javafx-fxml:17.0.8")
-    implementation("org.openjfx:javafx-graphics:21.0.2")
+    // Compose Multiplatform
+    implementation(compose.desktop.currentOs)
+    implementation(compose.material)
+    implementation(compose.ui)
+    implementation(compose.foundation)
+    implementation(compose.preview)
 
-    // Modern UI (AtlantaFX) & Icons
-    implementation("io.github.mkpaz:atlantafx-base:2.0.1")
-    implementation("org.kordamp.ikonli:ikonli-javafx:12.3.1")
-    implementation("org.kordamp.ikonli:ikonli-feather-pack:12.3.1")
-    implementation("org.kordamp.ikonli:ikonli-material2-pack:12.3.1")
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
 
-    // Utils
-    implementation("org.slf4j:slf4j-api:2.0.9")
-    implementation("ch.qos.logback:logback-classic:1.5.13")
-    implementation("com.google.code.gson:gson:2.10.1")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
-    compileOnly("org.projectlombok:lombok:1.18.30")
-    annotationProcessor("org.projectlombok:lombok:1.18.30")
+    // Logging
+    implementation("org.slf4j:slf4j-simple:2.0.9")
 }
 
-javafx {
-    version = "21"
-    modules("javafx.controls", "javafx.fxml", "javafx.graphics")
+compose.desktop {
     application {
-        mainClass.set("hivens.ui.Main")
+        mainClass = "hivens.ui.MainKt"
+
+        nativeDistributions {
+            targetFormats(
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
+            )
+            packageName = "AuraLauncher"
+            packageVersion = "1.0.0"
+        }
     }
 }
