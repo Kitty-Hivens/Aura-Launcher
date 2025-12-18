@@ -11,14 +11,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
-public class ManifestProcessorService implements IManifestProcessorService {
+public record ManifestProcessorService(Gson gson) implements IManifestProcessorService {
 
     private static final Logger log = LoggerFactory.getLogger(ManifestProcessorService.class);
-    private final Gson gson;
-
-    public ManifestProcessorService(Gson gson) {
-        this.gson = gson;
-    }
 
     @Override
     public FileManifest processManifest(String version) {
@@ -62,13 +57,13 @@ public class ManifestProcessorService implements IManifestProcessorService {
                 // Превращаем Map в Json, а потом в OptionalMod
                 String json = gson.toJson(modData);
                 OptionalMod mod = gson.fromJson(json, OptionalMod.class);
-                
+
                 if (mod.getId() == null) mod.setId(modId);
                 // Если с сервера не пришло jars, используем ID.jar как догадку
                 if (mod.getJars() == null || mod.getJars().isEmpty()) {
                     mod.setJars(List.of(modId + ".jar"));
                 }
-                
+
                 result.add(mod);
             } catch (Exception e) {
                 log.error("Failed to parse mod {}", modId, e);
@@ -78,7 +73,7 @@ public class ManifestProcessorService implements IManifestProcessorService {
     }
 
     @Deprecated
-    public List<OptionalMod> getOptionalModsForClient(String version) {
+    public List<OptionalMod> getOptionalModsForClient() {
         return Collections.emptyList();
     }
 }
