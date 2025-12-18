@@ -124,7 +124,6 @@ fun ShellUI(
         )
     )
 
-    // [FIX] Захватываем цвета из темы ЗДЕСЬ, так как внутри Canvas это делать нельзя
     val primaryColor = CaelestiaTheme.colors.primary
     val successColor = CaelestiaTheme.colors.success
     val bgAlpha = if (isDarkTheme) 0.15f else 0.05f
@@ -158,7 +157,7 @@ fun ShellUI(
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        successColor.copy(alpha = glowAlpha), // [FIX] Используем захваченную переменную
+                        successColor.copy(alpha = glowAlpha),
                         Color.Transparent
                     ),
                     center = Offset(x2, y2),
