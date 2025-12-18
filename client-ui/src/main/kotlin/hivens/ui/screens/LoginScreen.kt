@@ -1,108 +1,142 @@
 package hivens.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
+import hivens.ui.components.CaelestiaButton
+import hivens.ui.components.GlassCard
 import hivens.ui.di
+import hivens.ui.theme.CaelestiaTheme
 import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
-    var username by remember { mutableStateOf("") }
+    var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var rememberMe by remember { mutableStateOf(true) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var savePassword by remember { mutableStateOf(true) }
-
     val scope = rememberCoroutineScope()
 
-    // Загрузка сохраненного логина (как в initialize() старого контроллера)
-    LaunchedEffect(Unit) {
-        val saved = di.credentialsManager.load()
-        if (saved != null) {
-            username = saved.username
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.width(300.dp)
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        GlassCard(
+            modifier = Modifier.width(420.dp).wrapContentHeight(),
+            shape = RoundedCornerShape(24.dp),
+            backgroundColor = Color.Black.copy(alpha = 0.4f)
         ) {
-            Text("Aura Launcher", style = MaterialTheme.typography.h4)
-
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Логин") },
-                singleLine = true,
-                enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Пароль") },
-                singleLine = true,
-                enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth()
-                // VisualTransformation для звездочек можно добавить позже
-            )
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = savePassword,
-                    onCheckedChange = { savePassword = it },
-                    enabled = !isLoading
+            Column(
+                modifier = Modifier.padding(40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Caelestia",
+                    style = MaterialTheme.typography.h4,
+                    fontWeight = FontWeight.Bold,
+                    color = CaelestiaTheme.colors.textPrimary
                 )
-                Text("Запомнить пароль")
-            }
+                Spacer(modifier = Modifier.height(32.dp))
 
-            if (errorMessage != null) {
-                Text(errorMessage!!, color = MaterialTheme.colors.error)
-            }
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage!!,
+                        color = MaterialTheme.colors.error,
+                        style = MaterialTheme.typography.body2,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
 
-            Button(
-                onClick = {
-                    scope.launch {
+                OutlinedTextField(
+                    value = login,
+                    onValueChange = { login = it },
+                    label = { Text("Логин") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        textColor = CaelestiaTheme.colors.textPrimary,
+                        focusedBorderColor = CaelestiaTheme.colors.primary,
+                        unfocusedBorderColor = CaelestiaTheme.colors.border.copy(alpha = 0.5f),
+                        focusedLabelColor = CaelestiaTheme.colors.primary,
+                        unfocusedLabelColor = CaelestiaTheme.colors.textSecondary,
+                        cursorColor = CaelestiaTheme.colors.primary,
+                        backgroundColor = Color.Transparent
+                    )
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Пароль") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        textColor = CaelestiaTheme.colors.textPrimary,
+                        focusedBorderColor = CaelestiaTheme.colors.primary,
+                        unfocusedBorderColor = CaelestiaTheme.colors.border.copy(alpha = 0.5f),
+                        focusedLabelColor = CaelestiaTheme.colors.primary,
+                        unfocusedLabelColor = CaelestiaTheme.colors.textSecondary,
+                        cursorColor = CaelestiaTheme.colors.primary,
+                        backgroundColor = Color.Transparent
+                    )
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = rememberMe,
+                        onCheckedChange = { rememberMe = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = CaelestiaTheme.colors.primary,
+                            uncheckedColor = CaelestiaTheme.colors.border,
+                            checkmarkColor = Color.Black
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Запомнить пароль", color = CaelestiaTheme.colors.textPrimary)
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+
+                CaelestiaButton(
+                    text = if (isLoading) "Вход..." else "Войти",
+                    enabled = !isLoading && login.isNotEmpty() && password.isNotEmpty(),
+                    onClick = {
                         isLoading = true
                         errorMessage = null
-                        try {
-                            // Логика из LoginController.onLogin
-                            val serverId = di.profileManager.lastServerId ?: "Industrial" // Заглушка или выбор
-                            val session = di.authService.login(username, password, serverId)
-
-                            if (savePassword) {
-                                di.credentialsManager.save(username, password)
-                            } else {
-                                di.credentialsManager.clear()
+                        scope.launch {
+                            try {
+                                val lastServer = di.profileManager.lastServerId ?: "Industrial"
+                                val session = di.authService.login(login, password, lastServer)
+                                if (rememberMe) {
+                                    di.credentialsManager.save(login, password)
+                                }
+                                onLoginSuccess(session)
+                            } catch (e: Exception) {
+                                errorMessage = "Ошибка входа: ${e.message}"
+                                isLoading = false
                             }
-
-                            // Сохраняем имя для UI настроек
-                            val settings = di.settingsService.getSettings()
-                            settings.savedUsername = session.playerName
-                            di.settingsService.saveSettings(settings)
-
-                            onLoginSuccess(session)
-                        } catch (e: Exception) {
-                            errorMessage = "Ошибка: ${e.message}"
-                        } finally {
-                            isLoading = false
                         }
-                    }
-                },
-                enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth().height(50.dp)
-            ) {
-                if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                else Text("Войти")
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                )
             }
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -39,6 +40,7 @@ import hivens.ui.components.GlassCard
 import hivens.ui.screens.*
 import hivens.ui.theme.CaelestiaTheme
 import hivens.ui.utils.SkinManager
+import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -63,7 +65,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         state = windowState,
-        title = "Aura Launcher",
+        title = "Caelestia",
         resizable = false
     ) {
         CaelestiaTheme(useDarkTheme = isDarkTheme) {
@@ -82,24 +84,71 @@ fun main() = application {
                 }
             }
 
-            when (val state = appState) {
-                is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
-                is AppState.Shell -> ShellUI(
-                    initialSession = state.session,
-                    isDarkTheme = isDarkTheme,
-                    onToggleTheme = { isDarkTheme = !isDarkTheme },
-                    onLogout = { di.credentialsManager.clear(); appState = AppState.Login },
-                    onCloseApp = ::exitApplication
-                )
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
+                CaelestiaBackground(isDarkTheme = isDarkTheme)
+
+                when (val state = appState) {
+                    is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
+                    is AppState.Shell -> ShellUI(
+                        initialSession = state.session,
+                        onToggleTheme = { isDarkTheme = !isDarkTheme },
+                        onLogout = { di.credentialsManager.clear(); appState = AppState.Login },
+                        onCloseApp = ::exitApplication
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
+fun CaelestiaBackground(isDarkTheme: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val t by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.28f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(20000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        )
+    )
+
+    val primaryColor = CaelestiaTheme.colors.primary
+    val successColor = CaelestiaTheme.colors.success
+    val bgAlpha = if (isDarkTheme) 0.15f else 0.05f
+    val glowAlpha = if (isDarkTheme) 0.1f else 0.05f
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val width = size.width
+        val height = size.height
+
+        val x1 = width * 0.5f + cos(t) * width * 0.3f
+        val y1 = height * 0.5f + sin(t) * height * 0.2f
+
+        val x2 = width * 0.5f + cos(t + 3.14f) * width * 0.3f
+        val y2 = height * 0.5f + sin(t * 0.8f) * height * 0.2f
+
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(primaryColor.copy(alpha = bgAlpha), Color.Transparent),
+                center = Offset(x1, y1),
+                radius = width * 0.6f
+            )
+        )
+
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(successColor.copy(alpha = glowAlpha), Color.Transparent),
+                center = Offset(x2, y2),
+                radius = width * 0.5f
+            )
+        )
+    }
+}
+
+@Composable
 fun ShellUI(
     initialSession: SessionData,
-    isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
     onLogout: () -> Unit,
     onCloseApp: () -> Unit
@@ -113,129 +162,72 @@ fun ShellUI(
         faceBitmap = SkinManager.getSkinFront(currentSession.playerName)
     }
 
-    // --- Анимация фона ---
-    val infiniteTransition = rememberInfiniteTransition()
-    val t by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 6.28f, // 2*PI
-        animationSpec = infiniteRepeatable(
-            animation = tween(20000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
-    )
-
-    val primaryColor = CaelestiaTheme.colors.primary
-    val successColor = CaelestiaTheme.colors.success
-    val bgAlpha = if (isDarkTheme) 0.15f else 0.05f
-    val glowAlpha = if (isDarkTheme) 0.1f else 0.05f
-
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
-        // Живой фон "Aurora"
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val width = size.width
-            val height = size.height
-
-            // Пятно 1
-            val x1 = width * 0.5f + cos(t) * width * 0.3f
-            val y1 = height * 0.5f + sin(t) * height * 0.2f
-
-            // Пятно 2
-            val x2 = width * 0.5f + cos(t + 3.14f) * width * 0.3f
-            val y2 = height * 0.5f + sin(t * 0.8f) * height * 0.2f
-
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        primaryColor.copy(alpha = bgAlpha), // [FIX] Используем захваченную переменную
-                        Color.Transparent
-                    ),
-                    center = Offset(x1, y1),
-                    radius = width * 0.6f
-                )
-            )
-
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        successColor.copy(alpha = glowAlpha),
-                        Color.Transparent
-                    ),
-                    center = Offset(x2, y2),
-                    radius = width * 0.5f
-                )
-            )
-        }
-
-        Row(Modifier.fillMaxSize().padding(24.dp)) {
-            // --- DOCK ---
-            GlassCard(
-                modifier = Modifier.width(80.dp).fillMaxHeight(),
-                shape = MaterialTheme.shapes.large
+    Row(Modifier.fillMaxSize().padding(24.dp)) {
+        GlassCard(
+            modifier = Modifier.width(80.dp).fillMaxHeight(),
+            shape = MaterialTheme.shapes.large
+        ) {
+            Column(
+                Modifier.fillMaxSize().padding(vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
-                Column(
-                    Modifier.fillMaxSize().padding(vertical = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(32.dp)
+                Box(
+                    Modifier.size(48.dp).clip(CircleShape)
+                        .background(CaelestiaTheme.colors.surface)
+                        .border(1.dp, CaelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape),
+                    contentAlignment = Alignment.TopCenter
                 ) {
-                    // Аватар
-                    Box(
-                        Modifier.size(48.dp).clip(CircleShape)
-                            .background(CaelestiaTheme.colors.surface)
-                            .border(1.dp, CaelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape),
-                        contentAlignment = Alignment.TopCenter
-                    ) {
-                        if (faceBitmap != null) {
-                            Image(
-                                painter = BitmapPainter(faceBitmap!!),
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp).offset(y = 4.dp),
-                                contentScale = ContentScale.Crop,
-                                alignment = Alignment.TopCenter
-                            )
-                        } else {
-                            Text(
-                                currentSession.playerName.take(1).uppercase(),
-                                color = CaelestiaTheme.colors.primary,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-
-                    NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings) { currentScreen = ShellScreen.Home }
-                    NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) { currentScreen = ShellScreen.Profile }
-                    NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) { currentScreen = ShellScreen.GlobalSettings }
-
-                    Spacer(Modifier.weight(1f))
-
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CaelestiaTheme.colors.error.copy(alpha = 0.8f))
+                    if (faceBitmap != null) {
+                        Image(
+                            painter = BitmapPainter(faceBitmap!!),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp).offset(y = 4.dp),
+                            contentScale = ContentScale.Crop,
+                            alignment = Alignment.TopCenter
+                        )
+                    } else {
+                        Text(
+                            currentSession.playerName.take(1).uppercase(),
+                            color = CaelestiaTheme.colors.primary,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
                     }
                 }
+
+                Spacer(Modifier.height(16.dp))
+
+                NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings) { currentScreen = ShellScreen.Home }
+                NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) { currentScreen = ShellScreen.Profile }
+                NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) { currentScreen = ShellScreen.GlobalSettings }
+
+                Spacer(Modifier.weight(1f))
+
+                IconButton(onClick = onLogout) {
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CaelestiaTheme.colors.error.copy(alpha = 0.8f))
+                }
             }
+        }
 
-            Spacer(Modifier.width(24.dp))
+        Spacer(Modifier.width(24.dp))
 
-            // --- CONTENT ---
-            Box(Modifier.weight(1f).fillMaxHeight()) {
-                Crossfade(targetState = currentScreen) { screen ->
-                    when (screen) {
-                        is ShellScreen.Home -> DashboardScreen(
-                            session = currentSession,
-                            initialSelectedServer = selectedServer,
-                            onServerSelected = { server -> selectedServer = server },
-                            onSessionUpdated = { newSession -> currentSession = newSession },
-                            onCloseApp = onCloseApp,
-                            onOpenServerSettings = { server -> currentScreen = ShellScreen.ServerSettings(server) }
-                        )
-                        is ShellScreen.Profile -> ProfileScreen(currentSession)
-                        is ShellScreen.GlobalSettings -> SettingsScreen(isDarkTheme = isDarkTheme, onToggleTheme = onToggleTheme)
-                        is ShellScreen.ServerSettings -> ServerSettingsScreen(
-                            server = screen.server,
-                            onBack = { currentScreen = ShellScreen.Home }
-                        )
-                    }
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+            Crossfade(targetState = currentScreen) { screen ->
+                when (screen) {
+                    is ShellScreen.Home -> DashboardScreen(
+                        session = currentSession,
+                        initialSelectedServer = selectedServer,
+                        onServerSelected = { server -> selectedServer = server },
+                        onSessionUpdated = { newSession -> currentSession = newSession },
+                        onCloseApp = onCloseApp,
+                        onOpenServerSettings = { server -> currentScreen = ShellScreen.ServerSettings(server) }
+                    )
+                    is ShellScreen.Profile -> ProfileScreen(currentSession)
+                    is ShellScreen.GlobalSettings -> SettingsScreen(isDarkTheme = true, onToggleTheme = onToggleTheme)
+                    is ShellScreen.ServerSettings -> ServerSettingsScreen(
+                        server = screen.server,
+                        onBack = { currentScreen = ShellScreen.Home }
+                    )
                 }
             }
         }
