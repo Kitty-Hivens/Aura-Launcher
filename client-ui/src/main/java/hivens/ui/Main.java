@@ -3,6 +3,7 @@ package hivens.ui;
 import hivens.core.api.model.ServerProfile;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
+import hivens.launcher.LauncherDI;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;

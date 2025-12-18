@@ -6,6 +6,7 @@ import hivens.core.api.ILauncherService;
 import hivens.core.api.model.ServerProfile;
 import hivens.core.data.SessionData;
 import hivens.launcher.FileDownloadService;
+import hivens.launcher.LauncherDI;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.scene.control.Alert;

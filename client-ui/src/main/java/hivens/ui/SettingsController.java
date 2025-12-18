@@ -1,6 +1,7 @@
 package hivens.ui;
 
 import hivens.core.data.SettingsData;
+import hivens.launcher.LauncherDI;
 import javafx.fxml.FXML;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;

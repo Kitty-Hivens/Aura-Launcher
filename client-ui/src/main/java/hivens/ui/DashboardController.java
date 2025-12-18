@@ -1,9 +1,9 @@
 package hivens.ui;
 
-import hivens.config.ServiceEndpoints;
 import hivens.core.api.model.ServerProfile;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
+import hivens.launcher.LauncherDI;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;

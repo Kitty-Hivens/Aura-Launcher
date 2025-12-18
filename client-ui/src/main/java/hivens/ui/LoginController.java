@@ -3,11 +3,11 @@ package hivens.ui;
 import hivens.core.api.AuthException;
 import hivens.core.data.SessionData;
 import hivens.core.data.SettingsData;
+import hivens.launcher.LauncherDI;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
-import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

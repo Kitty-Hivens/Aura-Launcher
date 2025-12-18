@@ -1,9 +1,8 @@
-package hivens.ui;
+package hivens.launcher;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import hivens.core.api.*;
-import hivens.launcher.*;
 import lombok.Getter;
 import okhttp3.Authenticator;
 import okhttp3.Credentials;
@@ -59,8 +58,6 @@ public class LauncherDI {
         this.serverListService = new ServerListService();
         this.settingsService = new SettingsService(gson, dataDirectory.resolve("settings.json"));
         this.credentialsManager = new CredentialsManager(dataDirectory, gson);
-
-        // --- ИНИЦИАЛИЗАЦИЯ НОВЫХ МОДУЛЕЙ ---
         
         // 1. Менеджер профилей (InstanceProfile)
         this.profileManager = new ProfileManager(dataDirectory, gson);

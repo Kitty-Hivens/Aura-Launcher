@@ -4,6 +4,7 @@ import hivens.core.api.IManifestProcessorService;
 import hivens.core.api.model.ServerProfile;
 import hivens.core.data.InstanceProfile;
 import hivens.core.data.OptionalMod;
+import hivens.launcher.LauncherDI;
 import hivens.launcher.ProfileManager;
 import javafx.application.Platform;
 import javafx.fxml.FXML;

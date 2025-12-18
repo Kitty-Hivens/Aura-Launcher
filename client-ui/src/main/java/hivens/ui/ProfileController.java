@@ -1,7 +1,7 @@
 package hivens.ui;
 
-import hivens.config.ServiceEndpoints;
 import hivens.core.data.SessionData;
+import hivens.launcher.LauncherDI;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
