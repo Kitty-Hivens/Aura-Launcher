@@ -1,0 +1,83 @@
+name: Build Aura Launcher
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-apps:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'liberica'
+          java-version: '21'
+
+      # Кешируем Gradle, чтобы сборка летала
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # --- LINUX АГЕНТ ---
+      - name: Build Linux (Deb & AppImage dir)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # Собираем .deb
+          ./gradlew :client-ui:packageDeb
+          # Собираем переносимую папку (как ты хотел)
+          ./gradlew :client-ui:createDistributable
+          # Упаковываем папку в архив для удобства
+          cd client-ui/build/compose/binaries/main/app/linux
+          tar -czvf AuraLauncher-Linux.tar.gz AuraLauncher
+
+      # --- WINDOWS АГЕНТ ---
+      - name: Build Windows (MSI)
+        if: matrix.os == 'windows-latest'
+        run: ./gradlew :client-ui:packageMsi
+
+      # --- MACOS АГЕНТ ---
+      - name: Build macOS (DMG)
+        if: matrix.os == 'macos-latest'
+        run: ./gradlew :client-ui:packageDmg
+
+      # Забираем Linux .deb
+      - name: Upload Linux Deb
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraLauncher-Linux-Deb
+          path: client-ui/build/compose/binaries/main/deb/*.deb
+
+      # Забираем Linux Portable
+      - name: Upload Linux Portable
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraLauncher-Linux-Portable
+          path: client-ui/build/compose/binaries/main/app/linux/AuraLauncher-Linux.tar.gz
+
+      # Забираем Windows .msi
+      - name: Upload Windows MSI
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraLauncher-Windows
+          path: client-ui/build/compose/binaries/main/msi/*.msi
+
+      # Забираем Mac .dmg
+      - name: Upload macOS DMG
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraLauncher-MacOS
+          path: client-ui/build/compose/binaries/main/dmg/*.dmg
