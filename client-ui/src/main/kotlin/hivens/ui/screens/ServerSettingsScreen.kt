@@ -118,7 +118,14 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                             )
                         )
                     } else {
-                        Text("Автоматическая Java (${server.version.let { if(it.startsWith("1.12")) "Java 8" else "Java 17+" }})", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                        val autoJavaLabel = server.version.let { ver ->
+                            when {
+                                ver.startsWith("1.2") -> "Java 21"
+                                ver.startsWith("1.17") || ver.startsWith("1.18") || ver.startsWith("1.19") || ver.startsWith("1.20") -> "Java 17"
+                                else -> "Java 8"
+                            }
+                        }
+                        Text("Автоматическая Java ($autoJavaLabel)", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
                     }
 
                     Spacer(Modifier.weight(1f))
