@@ -70,7 +70,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         state = windowState,
-        title = "Celestia", // TODO: А тут точно Селестия?
+        title = "Aura Launcher",
         resizable = false
     ) {
         CelestiaTheme(useDarkTheme = isDarkTheme) {
