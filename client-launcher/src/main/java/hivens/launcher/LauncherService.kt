@@ -22,7 +22,7 @@ import kotlin.concurrent.thread
 
 enum class LauncherLogType { INFO, WARN, ERROR }
 
-class LauncherService(
+class LauncherService( // TODO: God class. Возможно стоит разделить на части.
     private val manifestProcessor: IManifestProcessorService,
     private val profileManager: ProfileManager,
     private val javaManager: JavaManagerService
@@ -41,7 +41,7 @@ class LauncherService(
 
     private enum class OS { WINDOWS, LINUX, MACOS, UNKNOWN }
 
-    // [NEW] Пайп для чтения логов
+    // Пайп для чтения логов
     private fun pipeOutput(stream: InputStream, type: LauncherLogType, onLog: (String, LauncherLogType) -> Unit) {
         val reader = BufferedReader(InputStreamReader(stream))
         thread(isDaemon = true) {
@@ -65,7 +65,7 @@ class LauncherService(
         }
     }
 
-    // [NEW] Главный метод запуска с логами
+    // Главный метод запуска с логами
     @Throws(IOException::class)
     fun launchClientWithLogs(
         sessionData: SessionData,
@@ -77,7 +77,7 @@ class LauncherService(
     ): Process {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
 
-        var memory = if (profile.memoryMb != null && profile.memoryMb!! > 0) profile.memoryMb!! else allocatedMemoryMB
+        var memory = if (profile.memoryMb > 0) profile.memoryMb else allocatedMemoryMB
         if (memory < 768) memory = 1024
 
         val javaExec: String = when {
@@ -139,7 +139,7 @@ class LauncherService(
         val pb = ProcessBuilder(jvmArgs)
         pb.directory(clientRootPath.toFile())
 
-        // [ВАЖНО] Перехватываем вывод
+        // Перехватываем вывод
         pb.redirectErrorStream(false)
 
         onLog("LAUNCH COMMAND: ${java.lang.String.join(" ", jvmArgs)}", LauncherLogType.INFO)
@@ -161,8 +161,6 @@ class LauncherService(
     ): Process {
         return launchClientWithLogs(sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB) { _, _ -> }
     }
-
-    // --- Вспомогательные методы (возвращены на место) ---
 
     private fun buildMinecraftArgs(
         sessionData: SessionData,

@@ -25,7 +25,7 @@ class FileDownloadService(
         private const val DOWNLOAD_BASE_URL = "https://www.smartycraft.ru/launcher/clients/"
 
         /**
-         * Список стандартных папок Minecraft, которые НЕЛЬЗЯ трогать.
+         * Список стандартных папок Minecraft.
          */
         private val STANDARD_DIRS = setOf(
             "mods", "config", "bin", "assets", "libraries", "libraries-1.12.2", "libraries-1.7.10",
@@ -53,11 +53,10 @@ class FileDownloadService(
         val filesToDownload = HashMap<String, String>()
         flattenJsonTree(clientJson.asJsonObject, "", filesToDownload)
 
-        // [FIX] Фильтрация модов
+        // Фильтрация модов
         if (!ignoredFiles.isNullOrEmpty()) {
             val before = filesToDownload.size
             filesToDownload.entries.removeIf { entry ->
-                // Проверяем "очищенное" имя файла
                 val cleanPath = sanitizePath(entry.key)
                 ignoredFiles.any { ignoredName -> 
                     cleanPath.endsWith("/$ignoredName") || cleanPath == ignoredName 
@@ -69,7 +68,6 @@ class FileDownloadService(
         logger.info("Файлов к загрузке: {}", filesToDownload.size)
         messageUI?.invoke("Проверка файлов...")
 
-        // Скачивание
         val downloaded = downloadFiles(targetDir, filesToDownload, messageUI, progressUI)
 
         // Обработка extra.zip (Конфиги)
@@ -81,7 +79,7 @@ class FileDownloadService(
     }
 
     /**
-     * [FIX] Главная магия: Превращает "Industrial/mods/jei.jar" -> "mods/jei.jar"
+     * Превращает "Industrial/mods/jei.jar" -> "mods/jei.jar"
      */
     private fun sanitizePath(rawPath: String?): String {
         if (rawPath.isNullOrEmpty()) return rawPath ?: ""
@@ -161,7 +159,7 @@ class FileDownloadService(
         for ((rawPath, expectedMd5) in filesToDownload) {
             progressUI?.invoke(current.get(), total)
 
-            // [FIX] Определяем правильный локальный путь (без "Industrial")
+            // Определяем правильный локальный путь (без "Industrial")
             val cleanPath = sanitizePath(rawPath)
             val targetFile = basePath.resolve(cleanPath)
 
@@ -179,7 +177,6 @@ class FileDownloadService(
                     downloadedCount.incrementAndGet()
                 } catch (e: IOException) {
                     logger.error("Ошибка скачивания: {}", rawPath, e)
-                    // throw e; // Можно не ронять весь лаунчер из-за одного файла
                 }
             }
             current.incrementAndGet()

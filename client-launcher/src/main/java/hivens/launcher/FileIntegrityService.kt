@@ -21,7 +21,6 @@ class FileIntegrityService : IFileIntegrityService {
         private const val BUFFER_SIZE = 8192
     }
 
-    // Пул MessageDigest для потокобезопасности
     private val digestProvider = ThreadLocal.withInitial {
         try {
             MessageDigest.getInstance(HASH_ALGORITHM)

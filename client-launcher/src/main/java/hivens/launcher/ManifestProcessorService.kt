@@ -14,11 +14,10 @@ class ManifestProcessorService(private val gson: Gson) : IManifestProcessorServi
 
     private val log = LoggerFactory.getLogger(ManifestProcessorService::class.java)
 
-    override fun processManifest(version: String): FileManifest? {
+    override fun processManifest(version: String): FileManifest {
         return FileManifest()
     }
 
-    // [FIX] Убрали nullable (?), так как в интерфейсе стоит FileManifest
     override fun flattenManifest(manifest: FileManifest): Map<String, FileData> {
         val result = HashMap<String, FileData>()
         flattenRecursive(manifest, "", result)
