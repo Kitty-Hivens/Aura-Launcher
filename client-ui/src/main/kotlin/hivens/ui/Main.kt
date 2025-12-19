@@ -14,7 +14,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Build // [NEW] Иконка для консоли (гаечный ключ)
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -39,6 +39,7 @@ import hivens.launcher.LauncherDI
 import hivens.ui.components.GlassCard
 import hivens.ui.screens.*
 import hivens.ui.theme.CaelestiaTheme
+import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.SkinManager
 import kotlinx.coroutines.launch
 import kotlin.math.cos
@@ -61,6 +62,11 @@ sealed class ShellScreen {
 fun main() = application {
     val windowState = rememberWindowState(width = 1000.dp, height = 650.dp)
     var isDarkTheme by remember { mutableStateOf(true) }
+
+    // Окно консоли (появляется только если активно)
+    if (GameConsoleService.shouldShowConsole) {
+        ConsoleWindow(onClose = { GameConsoleService.hide() })
+    }
 
     Window(
         onCloseRequest = ::exitApplication,
@@ -105,14 +111,9 @@ fun main() = application {
 fun CaelestiaBackground(isDarkTheme: Boolean) {
     val infiniteTransition = rememberInfiniteTransition()
     val t by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 6.28f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(20000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
+        initialValue = 0f, targetValue = 6.28f,
+        animationSpec = infiniteRepeatable(animation = tween(20000, easing = LinearEasing), repeatMode = RepeatMode.Restart)
     )
-
     val primaryColor = CaelestiaTheme.colors.primary
     val successColor = CaelestiaTheme.colors.success
     val bgAlpha = if (isDarkTheme) 0.15f else 0.05f
@@ -121,38 +122,18 @@ fun CaelestiaBackground(isDarkTheme: Boolean) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
-
         val x1 = width * 0.5f + cos(t) * width * 0.3f
         val y1 = height * 0.5f + sin(t) * height * 0.2f
-
         val x2 = width * 0.5f + cos(t + 3.14f) * width * 0.3f
         val y2 = height * 0.5f + sin(t * 0.8f) * height * 0.2f
 
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(primaryColor.copy(alpha = bgAlpha), Color.Transparent),
-                center = Offset(x1, y1),
-                radius = width * 0.6f
-            )
-        )
-
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(successColor.copy(alpha = glowAlpha), Color.Transparent),
-                center = Offset(x2, y2),
-                radius = width * 0.5f
-            )
-        )
+        drawRect(brush = Brush.radialGradient(colors = listOf(primaryColor.copy(alpha = bgAlpha), Color.Transparent), center = Offset(x1, y1), radius = width * 0.6f))
+        drawRect(brush = Brush.radialGradient(colors = listOf(successColor.copy(alpha = glowAlpha), Color.Transparent), center = Offset(x2, y2), radius = width * 0.5f))
     }
 }
 
 @Composable
-fun ShellUI(
-    initialSession: SessionData,
-    onToggleTheme: () -> Unit,
-    onLogout: () -> Unit,
-    onCloseApp: () -> Unit
-) {
+fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: () -> Unit, onCloseApp: () -> Unit) {
     var currentSession by remember { mutableStateOf(initialSession) }
     var currentScreen by remember { mutableStateOf<ShellScreen>(ShellScreen.Home) }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
@@ -163,54 +144,56 @@ fun ShellUI(
     }
 
     Row(Modifier.fillMaxSize().padding(24.dp)) {
-        GlassCard(
-            modifier = Modifier.width(80.dp).fillMaxHeight(),
-            shape = MaterialTheme.shapes.large
-        ) {
+        // --- БОКОВАЯ ПАНЕЛЬ ---
+        GlassCard(modifier = Modifier.width(80.dp).fillMaxHeight(), shape = MaterialTheme.shapes.large) {
             Column(
                 Modifier.fillMaxSize().padding(vertical = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
-                Box(
-                    Modifier.size(48.dp).clip(CircleShape)
-                        .background(CaelestiaTheme.colors.surface)
-                        .border(1.dp, CaelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape),
-                    contentAlignment = Alignment.TopCenter
-                ) {
+                // Аватар
+                Box(Modifier.size(48.dp).clip(CircleShape).background(CaelestiaTheme.colors.surface).border(1.dp, CaelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.TopCenter) {
                     if (faceBitmap != null) {
-                        Image(
-                            painter = BitmapPainter(faceBitmap!!),
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp).offset(y = 4.dp),
-                            contentScale = ContentScale.Crop,
-                            alignment = Alignment.TopCenter
-                        )
+                        Image(painter = BitmapPainter(faceBitmap!!), contentDescription = null, modifier = Modifier.size(48.dp).offset(y = 4.dp), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
                     } else {
-                        Text(
-                            currentSession.playerName.take(1).uppercase(),
-                            color = CaelestiaTheme.colors.primary,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
+                        Text(currentSession.playerName.take(1).uppercase(), color = CaelestiaTheme.colors.primary, modifier = Modifier.align(Alignment.Center))
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
 
+                // Основная навигация (Консоли тут больше нет)
                 NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings) { currentScreen = ShellScreen.Home }
                 NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) { currentScreen = ShellScreen.Profile }
                 NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) { currentScreen = ShellScreen.GlobalSettings }
 
                 Spacer(Modifier.weight(1f))
 
-                IconButton(onClick = onLogout) {
-                    Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CaelestiaTheme.colors.error.copy(alpha = 0.8f))
+                // [NEW] Нижний блок: Консоль (мелко) + Выход
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
+                    // Стильная маленькая кнопка отладки
+                    IconButton(onClick = { GameConsoleService.show() }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            // Гаечный ключ выглядит более "технически"
+                            Icons.Default.Build,
+                            contentDescription = "Debug Console",
+                            tint = CaelestiaTheme.colors.textSecondary.copy(alpha = 0.3f), // Очень тусклая, пока не наведешь
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Кнопка выхода
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CaelestiaTheme.colors.error.copy(alpha = 0.8f))
+                    }
                 }
             }
         }
 
         Spacer(Modifier.width(24.dp))
 
+        // --- КОНТЕНТ ---
         Box(Modifier.weight(1f).fillMaxHeight()) {
             Crossfade(targetState = currentScreen) { screen ->
                 when (screen) {
@@ -224,10 +207,7 @@ fun ShellUI(
                     )
                     is ShellScreen.Profile -> ProfileScreen(currentSession)
                     is ShellScreen.GlobalSettings -> SettingsScreen(isDarkTheme = true, onToggleTheme = onToggleTheme)
-                    is ShellScreen.ServerSettings -> ServerSettingsScreen(
-                        server = screen.server,
-                        onBack = { currentScreen = ShellScreen.Home }
-                    )
+                    is ShellScreen.ServerSettings -> ServerSettingsScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
                 }
             }
         }
@@ -237,11 +217,6 @@ fun ShellUI(
 @Composable
 fun NavButton(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (isSelected) CaelestiaTheme.colors.primary else CaelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
-            modifier = Modifier.size(32.dp)
-        )
+        Icon(icon, contentDescription = null, tint = if (isSelected) CaelestiaTheme.colors.primary else CaelestiaTheme.colors.textSecondary.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
     }
 }

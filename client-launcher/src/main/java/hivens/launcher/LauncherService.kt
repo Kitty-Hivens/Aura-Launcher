@@ -9,14 +9,20 @@ import hivens.core.data.OptionalMod
 import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
 import org.slf4j.LoggerFactory
+import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.io.InputStreamReader
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
 import java.util.stream.Collectors
+import kotlin.concurrent.thread
+
+enum class LauncherLogType { INFO, WARN, ERROR }
 
 class LauncherService(
     private val manifestProcessor: IManifestProcessorService,
@@ -37,37 +43,60 @@ class LauncherService(
 
     private enum class OS { WINDOWS, LINUX, MACOS, UNKNOWN }
 
+    // [NEW] Пайп для чтения логов
+    private fun pipeOutput(stream: InputStream, type: LauncherLogType, onLog: (String, LauncherLogType) -> Unit) {
+        val reader = BufferedReader(InputStreamReader(stream))
+        thread(isDaemon = true) {
+            try {
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val text = line ?: continue
+                    val finalType = if (type == LauncherLogType.ERROR) {
+                        LauncherLogType.ERROR
+                    } else if (text.contains("WARN", ignoreCase = true)) {
+                        LauncherLogType.WARN
+                    } else if (text.contains("ERROR", ignoreCase = true) || text.contains("Exception", ignoreCase = true)) {
+                        LauncherLogType.ERROR
+                    } else {
+                        LauncherLogType.INFO
+                    }
+                    onLog(text, finalType)
+                    if (finalType == LauncherLogType.ERROR) System.err.println(text) else println(text)
+                }
+            } catch (e: Exception) { /* Stream closed */ }
+        }
+    }
+
+    // [NEW] Главный метод запуска с логами
     @Throws(IOException::class)
-    override fun launchClient(
+    fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
-        allocatedMemoryMB: Int
+        allocatedMemoryMB: Int,
+        onLog: (String, LauncherLogType) -> Unit
     ): Process {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
 
-        // Память
         var memory = if (profile.memoryMb != null && profile.memoryMb!! > 0) profile.memoryMb!! else allocatedMemoryMB
         if (memory < 768) memory = 1024
 
-        // Java
         val javaExec: String = when {
             !profile.javaPath.isNullOrEmpty() -> profile.javaPath!!
             Files.exists(javaExecutablePath) -> javaExecutablePath.toString()
             else -> javaManager.getJavaPath(serverProfile.version).toString()
         }
 
+        onLog("Starting ${serverProfile.name} with Java: $javaExec, RAM: $memory", LauncherLogType.INFO)
         log.info("Starting {} with Java: {}, RAM: {}", serverProfile.name, javaExec, memory)
 
         val version = serverProfile.version
         val config = launchConfigs[version] ?: throw IOException("Unsupported version: $version")
 
-        // === МОДЫ: Логика и Диагностика ===
         val allMods = manifestProcessor.getOptionalModsForClient(serverProfile)
         val manifest = sessionData.fileManifest ?: FileManifest()
 
-        // Передаем в syncMods для отладки
         syncMods(clientRootPath, profile, allMods, manifest, version)
 
         prepareNatives(clientRootPath, config.nativesDir, version)
@@ -75,11 +104,7 @@ class LauncherService(
 
         val jvmArgs = ArrayList<String>()
         jvmArgs.add(javaExec)
-
-        // [CRITICAL] FIX FOR JAVA 8u300+ AND OLD FORGE/MIXIN
         jvmArgs.add("-noverify")
-        // Можно попробовать добавить еще это, если -noverify мало:
-        // jvmArgs.add("-Djava.compiler=NONE")
 
         if (getPlatform() == OS.MACOS) {
             jvmArgs.add("-XstartOnFirstThread")
@@ -115,14 +140,31 @@ class LauncherService(
 
         val pb = ProcessBuilder(jvmArgs)
         pb.directory(clientRootPath.toFile())
-        pb.inheritIO()
 
-        log.info("--------------------------------------------------")
-        log.info("LAUNCH COMMAND: {}", java.lang.String.join(" ", jvmArgs))
-        log.info("--------------------------------------------------")
+        // [ВАЖНО] Перехватываем вывод
+        pb.redirectErrorStream(false)
 
-        return pb.start()
+        onLog("LAUNCH COMMAND: ${java.lang.String.join(" ", jvmArgs)}", LauncherLogType.INFO)
+
+        val process = pb.start()
+
+        pipeOutput(process.inputStream, LauncherLogType.INFO, onLog)
+        pipeOutput(process.errorStream, LauncherLogType.ERROR, onLog)
+
+        return process
     }
+
+    override fun launchClient(
+        sessionData: SessionData,
+        serverProfile: ServerProfile,
+        clientRootPath: Path,
+        javaExecutablePath: Path,
+        allocatedMemoryMB: Int
+    ): Process {
+        return launchClientWithLogs(sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB) { _, _ -> }
+    }
+
+    // --- Вспомогательные методы (возвращены на место) ---
 
     private fun buildMinecraftArgs(
         sessionData: SessionData,
@@ -160,63 +202,12 @@ class LauncherService(
             val targetZipName = "natives-$version.zip"
             val nativesZip = binDir.resolve(targetZipName)
             if (Files.exists(nativesZip)) {
-                log.info("Extracting server natives...")
                 try {
                     ZipUtils.unzip(nativesZip.toFile(), nativesDir.toFile())
                 } catch (e: IOException) {
                     log.error("Failed to unzip server natives", e)
                 }
             }
-        }
-
-        val currentOS = getPlatform()
-        if (!checkNativesIntegrity(nativesDir, currentOS)) {
-            log.warn("⚠️ Natives for {} are missing or incomplete! Downloading fallback...", currentOS)
-            downloadFallbackNatives(nativesDir, version, currentOS)
-        }
-    }
-
-    private fun checkNativesIntegrity(nativesDir: Path, os: OS): Boolean {
-        try {
-            Files.list(nativesDir).use { stream ->
-                val files = stream.map { it.fileName.toString() }.collect(Collectors.toList())
-                if (files.isEmpty()) return false
-                return when (os) {
-                    OS.WINDOWS -> files.any { it.endsWith(".dll") }
-                    OS.LINUX -> files.any { it.endsWith(".so") }
-                    OS.MACOS -> files.any { it.endsWith(".dylib") || it.endsWith(".jnilib") }
-                    else -> true
-                }
-            }
-        } catch (e: IOException) {
-            return false
-        }
-    }
-
-    private fun downloadFallbackNatives(targetDir: Path, version: String, os: OS) {
-        try {
-            val baseUrl = "https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform"
-            val artifactVersion: String = if ("1.7.10" == version) "2.9.1" else "2.9.4-nightly-20150209"
-            val osSuffix = when (os) {
-                OS.LINUX -> "natives-linux"
-                OS.MACOS -> "natives-osx"
-                OS.WINDOWS -> "natives-windows"
-                else -> throw IllegalStateException("Unsupported OS: $os")
-            }
-            val fileName = "lwjgl-platform-$artifactVersion-$osSuffix.jar"
-            val url = "$baseUrl/$artifactVersion/$fileName"
-            log.info("Downloading natives from: {}", url)
-
-            val tempJar = Files.createTempFile("natives_$osSuffix", ".jar")
-            val downloadUrl = URL(url)
-            downloadUrl.openStream().use { input ->
-                Files.copy(input, tempJar, StandardCopyOption.REPLACE_EXISTING)
-            }
-            ZipUtils.unzip(tempJar.toFile(), targetDir.toFile())
-            Files.deleteIfExists(tempJar)
-            log.info("✅ Natives for {} installed successfully!", os)
-        } catch (e: Exception) {
-            log.error("Failed to download fallback natives", e)
         }
     }
 
@@ -226,7 +217,6 @@ class LauncherService(
         if (Files.exists(assetsZip)) {
             val indexesDir = assetsDir.resolve("indexes").toFile()
             if (!indexesDir.exists() || !indexesDir.isDirectory) {
-                log.info("Extracting assets archive...")
                 try {
                     ZipUtils.unzip(assetsZip.toFile(), assetsDir.toFile())
                 } catch (e: IOException) {
@@ -248,45 +238,29 @@ class LauncherService(
         if (!Files.exists(modsDir)) Files.createDirectories(modsDir)
 
         val allowedFiles = HashSet<String>()
-
-        // Собираем имена файлов всех опциональных модов, чтобы исключить их из "обязательных"
         val optionalJarNames = HashSet<String>()
         for (mod in allMods) {
             optionalJarNames.addAll(mod.jars)
         }
 
-        // 1. Обязательные моды из манифеста (ИСКЛЮЧАЯ ОПЦИОНАЛЬНЫЕ)
         val flatFiles = manifestProcessor.flattenManifest(manifest)
         for (path in flatFiles.keys) {
             if (path.contains("/mods/") || path.startsWith("mods/")) {
                 val fileName = File(path).name
-
-                // Если этот файл есть в списке опциональных модов, пропускаем его здесь.
-                // Его судьбу решит блок ниже.
                 if (!optionalJarNames.contains(fileName)) {
                     allowedFiles.add(fileName)
                 }
             }
         }
 
-        log.info("DEBUG: Mandatory mods count: ${allowedFiles.size}")
-
-        // 2. Опциональные моды (Включение по выбору игрока)
         val state = profile.optionalModsState
-
         for (mod in allMods) {
-            // Если в профиле нет записи, берем isDefault
             val isEnabled = state.getOrDefault(mod.id, mod.isDefault)
-
             if (isEnabled) {
                 allowedFiles.addAll(mod.jars)
-                log.info("DEBUG: Mod ENABLED: ${mod.name}")
-            } else {
-                log.info("DEBUG: Mod DISABLED: ${mod.name}")
             }
         }
 
-        // 3. Очистка
         cleanDirectory(modsDir, allowedFiles)
 
         if (clientVersion.isNotEmpty()) {
@@ -299,9 +273,6 @@ class LauncherService(
 
     @Throws(IOException::class)
     private fun cleanDirectory(dir: Path, allowedFiles: Set<String>) {
-        log.info("---------------- CLEANUP ----------------")
-        log.info("Allowed files count: ${allowedFiles.size}")
-
         Files.list(dir).use { stream ->
             stream.filter { Files.isRegularFile(it) }
                 .filter { path ->
@@ -310,11 +281,7 @@ class LauncherService(
                 }
                 .forEach { path ->
                     val fileName = path.fileName.toString()
-
-                    if (allowedFiles.contains(fileName)) {
-                        log.info("KEEP: $fileName")
-                    } else {
-                        log.warn("DELETE: $fileName (Not in allowed list)")
+                    if (!allowedFiles.contains(fileName)) {
                         try {
                             Files.delete(path)
                         } catch (e: IOException) {
@@ -323,7 +290,6 @@ class LauncherService(
                     }
                 }
         }
-        log.info("-----------------------------------------")
     }
 
     private fun buildClasspath(clientRootPath: Path, manifest: FileManifest): String {
