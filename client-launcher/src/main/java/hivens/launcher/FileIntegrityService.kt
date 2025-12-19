@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.core.api.IFileIntegrityService
+import hivens.core.api.interfaces.IFileIntegrityService
 import hivens.core.data.FileStatus
 import org.slf4j.LoggerFactory
 import java.io.IOException

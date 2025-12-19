@@ -3,6 +3,7 @@ package hivens.launcher
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import hivens.core.api.*
+import hivens.core.api.interfaces.*
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import java.net.InetSocketAddress

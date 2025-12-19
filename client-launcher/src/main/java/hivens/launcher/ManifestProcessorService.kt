@@ -1,7 +1,7 @@
 package hivens.launcher
 
 import com.google.gson.Gson
-import hivens.core.api.IManifestProcessorService
+import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest

@@ -1,7 +1,7 @@
 package hivens.launcher
 
-import hivens.core.api.ILauncherService
-import hivens.core.api.IManifestProcessorService
+import hivens.core.api.interfaces.ILauncherService
+import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
 import hivens.core.data.InstanceProfile
@@ -14,10 +14,8 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
-import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.util.*
 import java.util.stream.Collectors
 import kotlin.concurrent.thread

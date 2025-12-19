@@ -1,9 +1,8 @@
 package hivens.launcher
 
 import com.google.gson.Gson
-import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import hivens.core.api.IFileDownloadService
+import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
 import okhttp3.OkHttpClient

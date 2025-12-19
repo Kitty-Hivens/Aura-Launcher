@@ -1,7 +1,7 @@
 package hivens.launcher
 
 import com.google.gson.Gson
-import hivens.core.api.ISettingsService
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SettingsData
 import org.slf4j.LoggerFactory
 import java.io.IOException

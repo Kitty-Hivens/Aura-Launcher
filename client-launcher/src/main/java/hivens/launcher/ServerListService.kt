@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.core.api.IServerListService
+import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.SmartyNetworkService
 import hivens.core.api.dto.SmartyServer
 import hivens.core.api.model.ServerProfile
