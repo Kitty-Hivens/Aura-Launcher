@@ -16,7 +16,7 @@ import java.nio.file.Paths
 class LauncherDI {
 
     val dataDirectory: Path
-    private val httpClient: OkHttpClient
+    val httpClient: OkHttpClient
     private val gson: Gson
 
     // Сервисы

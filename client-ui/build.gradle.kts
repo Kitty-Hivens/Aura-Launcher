@@ -30,6 +30,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
 
     // Image
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
 
     // Logging
