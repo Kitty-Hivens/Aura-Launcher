@@ -53,7 +53,7 @@ class EnvironmentPreparer {
             log.info("Found local zip. Unpacking...")
             try {
                 ZipUtils.unzip(nativesZip.toFile(), nativesDir.toFile())
-                flattenNatives(nativesDir) // <--- НОВОЕ: Вытаскиваем файлы из подпапок
+                flattenNatives(nativesDir)
 
                 if (isFolderValidForOs(nativesDir, osSuffix)) {
                     unpackedSuccessfully = true
@@ -70,7 +70,7 @@ class EnvironmentPreparer {
         if (!unpackedSuccessfully) {
             log.warn("Downloading natives from Maven Central...")
             downloadFromMaven(nativesDir, osSuffix)
-            flattenNatives(nativesDir) // <--- НОВОЕ: Вытаскиваем файлы
+            flattenNatives(nativesDir)
 
             if (!isFolderValidForOs(nativesDir, osSuffix)) {
                 log.error("CRITICAL: Failed to provide natives via Maven!")
@@ -79,7 +79,7 @@ class EnvironmentPreparer {
     }
 
     /**
-     * Перемещает все .so/.dll/.dylib файлы из подпапок в корень nativesDir.
+     * Перемещает все .so/.dll/.dylib файлы из под папок в корень nativesDir.
      * Maven архивы LWJGL содержат файлы в linux/x64/org/..., а Java ищет их в корне.
      */
     private fun flattenNatives(dir: Path) {
@@ -94,7 +94,6 @@ class EnvironmentPreparer {
 
             for (lib in libraries) {
                 val target = dir.resolve(lib.fileName)
-                // Если файл не в корне, переносим его
                 if (lib.parent != dir) {
                     Files.move(lib, target, StandardCopyOption.REPLACE_EXISTING)
                 }
@@ -142,7 +141,6 @@ class EnvironmentPreparer {
         }
     }
 
-    // Метод prepareAssets оставляем без изменений
     fun prepareAssets(clientRoot: Path, assetsZipName: String) {
         val assetsDir = clientRoot.resolve("assets")
         val objectsDir = assetsDir.resolve("objects")
