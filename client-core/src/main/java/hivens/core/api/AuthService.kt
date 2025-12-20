@@ -109,6 +109,7 @@ class AuthService(baseClient: OkHttpClient, private val gson: Gson) : IAuthServi
                 return SessionData(
                     status = authResp.status,
                     playerName = authResp.playername ?: "",
+                    uid = authResp.uid ?: "",
                     uuid = cleanUuid,
                     accessToken = finalGameToken ?: "",
                     fileManifest = authResp.client,

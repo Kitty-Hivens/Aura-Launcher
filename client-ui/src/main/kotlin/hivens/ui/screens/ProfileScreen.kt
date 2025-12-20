@@ -168,26 +168,7 @@ fun ProfileScreen(session: SessionData, networkService: SmartyNetworkService) {
                                 scope.launch {
                                     val result = withContext(Dispatchers.IO) {
                                         // Используем переданный сервис
-                                        networkService.uploadAsset(file, "skin", session.accessToken)
-                                    }
-                                    uploadStatus = result
-                                    if (!result.startsWith("Ошибка")) {
-                                        SkinManager.invalidate(session.playerName)
-                                        loadSkins()
-                                    }
-                                }
-                            }
-                        }, modifier = Modifier.fillMaxWidth(), primary = false)
-
-                        Spacer(Modifier.height(16.dp))
-
-                        CelestiaButton("Загрузить плащ", onClick = {
-                            val file = pickImage("Выберите плащ (PNG)")
-                            if (file != null) {
-                                uploadStatus = "Загрузка..."
-                                scope.launch {
-                                    val result = withContext(Dispatchers.IO) {
-                                        networkService.uploadAsset(file, "cloak", session.accessToken)
+                                        networkService.uploadAsset(file, "skin", session)
                                     }
                                     uploadStatus = result
                                     if (!result.startsWith("Ошибка")) {
