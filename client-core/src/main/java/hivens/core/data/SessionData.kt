@@ -10,5 +10,6 @@ data class SessionData(
     @SerializedName("client") val fileManifest: FileManifest? = null,
 
     val serverId: String? = null,
-    val cachedPassword: String? = null
+    val cachedPassword: String? = null,
+    val balance: Int = 0
 )

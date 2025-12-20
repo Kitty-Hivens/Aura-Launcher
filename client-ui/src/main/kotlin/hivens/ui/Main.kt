@@ -204,7 +204,7 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
                         onCloseApp = onCloseApp,
                         onOpenServerSettings = { server -> currentScreen = ShellScreen.ServerSettings(server) }
                     )
-                    is ShellScreen.Profile -> ProfileScreen(currentSession)
+                    is ShellScreen.Profile -> ProfileScreen(currentSession, di.smartyNetworkService)
                     is ShellScreen.GlobalSettings -> SettingsScreen(isDarkTheme = true, onToggleTheme = onToggleTheme)
                     is ShellScreen.ServerSettings -> ServerSettingsScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
                 }

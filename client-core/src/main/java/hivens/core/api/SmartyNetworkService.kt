@@ -4,10 +4,9 @@ import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import hivens.config.ServiceEndpoints
 import hivens.core.api.dto.SmartyResponse
-import hivens.core.api.dto.SmartyServer
-import hivens.core.api.interfaces.IServerListService
-import hivens.core.api.model.ServerProfile
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.asRequestBody
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
@@ -16,17 +15,19 @@ import java.net.Proxy
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
-class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : IServerListService {
+class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) {
 
     private val logger = LoggerFactory.getLogger(SmartyNetworkService::class.java)
+
+    // URL официального лаунчера для обхода защиты
     private val officialJarUrl = "https://www.smartycraft.ru/downloads/smartycraft.jar"
     private val cachedHashFile = File("smarty_hash.cache")
+
+    // Дефолтный хеш (обновится сам, если устарел)
     private var currentHash = "5515a4bdd5f532faf0db61b8263d1952"
 
-    // Настраиваем клиент с SOCKS прокси
     private val client: OkHttpClient = baseClient.newBuilder()
         .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("proxy.smartycraft.ru", 1080)))
         .proxyAuthenticator { _, response ->
@@ -35,13 +36,12 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
                 .header("Proxy-Authorization", credential)
                 .build()
         }
-        // Увеличенные таймауты для скачивания JAR
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     init {
-        // Пытаемся загрузить кэшированный хеш с диска
+        // Восстанавливаем хеш из кэша при запуске
         if (cachedHashFile.exists()) {
             try {
                 currentHash = Files.readString(cachedHashFile.toPath()).trim()
@@ -52,54 +52,69 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
         }
     }
 
-    override fun fetchProfiles(): CompletableFuture<List<ServerProfile>> {
-        return CompletableFuture.supplyAsync {
-            val smartyServers = getServers()
+    /**
+     * Получает данные для Дашборда (Серверы + Новости).
+     * Если хеш устарел (статус UPDATE), автоматически обновляет его.
+     */
+    fun getDashboardResponse(): SmartyResponse {
+        var response = tryGetDashboard(currentHash)
 
-            smartyServers.map { s ->
-                ServerProfile(
-                    name = s.name ?: "Unknown",
-                    version = s.version ?: "",
-                    ip = s.address ?: "",
-                    port = s.port
-                ).apply {
-                    extraCheckSum = s.extraCheckSum
-                    optionalModsData = s.optionalMods
-                }
+        if (response.status == "UPDATE") {
+            logger.info("Protection triggered (Status: UPDATE). Initiating bypass...")
+
+            val newHash = downloadAndCalculateHash()
+
+            if (newHash != null) {
+                logger.info("Bypass successful. New hash: $newHash")
+                currentHash = newHash
+                saveHashToCache(newHash)
+
+                // Повторяем запрос с новым хешем
+                response = tryGetDashboard(newHash)
+            } else {
+                logger.error("Bypass failed. Could not calculate new hash.")
             }
         }
+
+        return response
     }
 
-    fun getServers(): List<SmartyServer> {
+    /**
+     * Загружает скин или плащ на сервер.
+     */
+    fun uploadAsset(file: File, type: String, session: String): String {
+        // Используем современные расширения OkHttp (избавляемся от Deprecated)
+        val mediaType = "image/png".toMediaTypeOrNull()
+        val fileBody = file.asRequestBody(mediaType)
+
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("action", "upload")
+            .addFormDataPart("type", type)
+            .addFormDataPart("session", session)
+            .addFormDataPart("file", file.name, fileBody)
+            .build()
+
+        val request = Request.Builder()
+            .url(ServiceEndpoints.AUTH_LOGIN)
+            .post(requestBody)
+            .header("User-Agent", "SMARTYlauncher/3.6.2")
+            .build()
+
         return try {
-            // Попытка 1: С текущим хешем
-            var servers = tryGetServers(currentHash)
-
-            if (servers == null) {
-                logger.info("Server requires hash update (Status: UPDATE)...")
-                val newHash = downloadAndCalculateHash()
-                
-                if (newHash != null) {
-                    currentHash = newHash
-                    // Сохраняем новый хеш на будущее
-                    try {
-                        Files.writeString(cachedHashFile.toPath(), newHash)
-                    } catch (e: IOException) {
-                        logger.error("Failed to save hash cache", e)
-                    }
-                    
-                    // Попытка 2: С новым хешем
-                    servers = tryGetServers(newHash)
-                }
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return "Ошибка сети: ${response.code}"
+                response.body?.string()?.trim() ?: "Ошибка: Пустой ответ"
             }
-            servers ?: emptyList()
         } catch (e: Exception) {
-            logger.error("Error fetching servers", e)
-            emptyList()
+            logger.error("Upload asset failed", e)
+            "Ошибка: ${e.message}"
         }
     }
 
-    private fun tryGetServers(hash: String): List<SmartyServer>? {
+    // --- Приватные методы ---
+
+    private fun tryGetDashboard(hash: String): SmartyResponse {
         val jsonBody = """
             {
                 "version": "3.6.2",
@@ -108,7 +123,7 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
                 "testModeKey": "false",
                 "debug": "false"
             }
-        """.trimIndent() // Хоть и кажется, что мы криворукие, раз cheksum написали. Не бейте. Это не наша вина.
+        """.trimIndent()
 
         val formBody = FormBody.Builder()
             .add("action", "loader")
@@ -121,43 +136,37 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
             .header("User-Agent", "SMARTYlauncher/3.6.2")
             .build()
 
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return emptyList()
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return SmartyResponse()
 
-            var rawJson = response.body?.string() ?: return emptyList()
+                var rawJson = response.body?.string() ?: return SmartyResponse()
 
-            // Очистка ответа от мусора
-            val jsonStart = rawJson.indexOf("{")
-            if (jsonStart != -1) {
-                rawJson = rawJson.substring(jsonStart)
-            }
-
-            return try {
-                val smartyResponse = gson.fromJson(rawJson, SmartyResponse::class.java)
-
-                if ("UPDATE" == smartyResponse.status) {
-                    return null // null означает сигнал "нужен пересчет хеша"
+                // Очистка от HTML-мусора
+                val jsonStart = rawJson.indexOf("{")
+                if (jsonStart != -1) {
+                    rawJson = rawJson.substring(jsonStart)
                 }
 
-                if ("OK" == smartyResponse.status) {
-                    return smartyResponse.servers
+                return try {
+                    gson.fromJson(rawJson, SmartyResponse::class.java)
+                } catch (e: JsonSyntaxException) {
+                    logger.error("Parsing error: $rawJson", e)
+                    SmartyResponse()
                 }
-                
-                logger.warn("API Error Status: ${smartyResponse.status}")
-                emptyList()
-            } catch (e: JsonSyntaxException) {
-                logger.error("Parsing error: $rawJson", e)
-                emptyList()
             }
+        } catch (e: Exception) {
+            logger.error("Network error in tryGetDashboard", e)
+            return SmartyResponse()
         }
     }
 
     private fun downloadAndCalculateHash(): String? {
         try {
-            logger.info("Downloading official launcher to bypass protection...")
-            
+            logger.info("Downloading official launcher form $officialJarUrl...")
+
             val tempJar = Files.createTempFile("smarty_temp", ".jar")
-            
+
             val request = Request.Builder()
                 .url(officialJarUrl)
                 .header("User-Agent", "SMARTYlauncher/3.6.2")
@@ -173,7 +182,7 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
                 }
             }
 
-            // Вычисляем MD5
+            logger.info("Calculating MD5 hash...")
             val digest = MessageDigest.getInstance("MD5")
             Files.newInputStream(tempJar).use { fis ->
                 val buffer = ByteArray(1024)
@@ -182,10 +191,9 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
                     digest.update(buffer, 0, bytesCount)
                 }
             }
-            
+
             Files.deleteIfExists(tempJar)
 
-            // Конвертация байтов в hex строку
             val bytes = digest.digest()
             val sb = StringBuilder()
             for (b in bytes) {
@@ -196,6 +204,15 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
         } catch (e: Exception) {
             logger.error("Failed to calculate new hash", e)
             return null
+        }
+    }
+
+    private fun saveHashToCache(hash: String) {
+        try {
+            Files.writeString(cachedHashFile.toPath(), hash)
+            logger.info("New hash saved to cache.")
+        } catch (e: IOException) {
+            logger.error("Failed to save hash cache", e)
         }
     }
 }
